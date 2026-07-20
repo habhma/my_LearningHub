@@ -136,7 +136,7 @@ export const deleteUser = async (req: AuthRequest, res: Response) => {
  */
 export const updateMyProfile = async (req: AuthRequest, res: Response) => {
   try {
-    const { fullName, schoolName, classLevel, dateOfBirth, bio } = req.body;
+    const { fullName, schoolName, classLevel, dateOfBirth, bio, preferences } = req.body;
 
     console.log('=== UPDATE PROFILE REQUEST ===');
     console.log('User ID:', req.user?.id);
@@ -161,6 +161,7 @@ export const updateMyProfile = async (req: AuthRequest, res: Response) => {
       classLevel: classLevel !== undefined ? parseInt(classLevel) : undefined,
       dateOfBirth,
       bio,
+      preferences,
     });
 
     console.log('Profile update successful:', result);

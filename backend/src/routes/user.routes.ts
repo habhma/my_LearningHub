@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth';
 import { list, getById, update, deleteUser, updateMyProfile, stats } from '../controllers/user.controller';
+import prisma from '../config/database';
 
 const router = Router();
 
@@ -8,10 +9,67 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/me', async (req: any, res) => {
-  res.status(200).json({
-    success: true,
-    data: req.user,
-  });
+  try {
+    console.log('=== /users/me REQUEST ===');
+    console.log('User ID from token:', req.user.id);
+
+    // Fetch full user with profile including preferences
+    const user = await prisma.user.findUnique({
+      where: { id: BigInt(req.user.id) },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        status: true,
+        emailVerified: true,
+        lastLoginAt: true,
+        createdAt: true,
+        updatedAt: true,
+        profile: {
+          select: {
+            fullName: true,
+            classLevel: true,
+            schoolName: true,
+            dateOfBirth: true,
+            bio: true,
+            preferences: true,
+          },
+        },
+      },
+    });
+
+    console.log('User fetched from DB:', {
+      id: user?.id.toString(),
+      email: user?.email,
+      hasProfile: !!user?.profile,
+      preferences: user?.profile?.preferences,
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'User not found' },
+      });
+    }
+
+    const responseData = {
+      ...user,
+      id: user.id.toString(),
+    };
+
+    console.log('Response data preferences:', responseData.profile?.preferences);
+
+    return res.status(200).json({
+      success: true,
+      data: responseData,
+    });
+  } catch (error: any) {
+    console.error('Error in /users/me:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: error.message || 'Failed to fetch user' },
+    });
+  }
 });
 
 // Update the logged-in user's own profile (any authenticated role)

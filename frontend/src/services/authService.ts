@@ -32,8 +32,8 @@ export const authService = {
 
   // Get current user
   getCurrentUser: async (): Promise<User> => {
-    const response = await apiClient.get<User>('/users/me');
-    return response.data;
+    const response = await apiClient.get('/users/me');
+    return response.data.data; // Extract data from { success: true, data: {...} }
   },
 
   // Change password

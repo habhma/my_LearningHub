@@ -7,10 +7,14 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import { soundManager } from '@/utils/sounds';
+import { useAuthStore } from '@/store/authStore';
+import { SPORTS_STARS, SportsStar } from '@/data/sportsStars';
+import CongratulatoryModal from '@/components/gamification/CongratulatoryModal';
 
 function TakeAssessment() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [attemptData, setAttemptData] = useState<StartAttemptResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -19,6 +23,12 @@ function TakeAssessment() {
   const [savingQuestionId, setSavingQuestionId] = useState<string | null>(null);
   const [testStarted, setTestStarted] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0); // NEW: Track current question
+
+  // Gamification state
+  const [showCongratulations, setShowCongratulations] = useState(false);
+  const [currentCelebratingStar, setCurrentCelebratingStar] = useState<SportsStar | null>(null);
+  const [currentMilestone, setCurrentMilestone] = useState(0);
+  const [milestonesReached, setMilestonesReached] = useState<Set<number>>(new Set());
 
   // Timer state
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
@@ -167,7 +177,12 @@ function TakeAssessment() {
 
       // Store answer and feedback
       setAnswers((prev) => ({ ...prev, [questionId]: optionId }));
-      setAnswerFeedback((prev) => ({ ...prev, [questionId]: isCorrect }));
+      setAnswerFeedback((prev) => {
+        const newFeedback = { ...prev, [questionId]: isCorrect };
+        // Check milestone after updating feedback
+        checkMilestone(newFeedback);
+        return newFeedback;
+      });
 
       setSavingQuestionId(questionId);
       try {
@@ -226,6 +241,87 @@ function TakeAssessment() {
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(prev => prev - 1);
       soundManager.playClick();
+    }
+  };
+
+  // Check if milestone is reached (20%, 40%, 60%, 80%, 100%)
+  const checkMilestone = (feedback: Record<string, boolean>) => {
+    if (!attemptData) return;
+
+    const totalQuestions = attemptData.questions.length;
+    const answeredQuestions = Object.keys(feedback).length;
+
+    console.log('=== MILESTONE CHECK ===');
+    console.log('Total questions:', totalQuestions);
+    console.log('Answered questions:', answeredQuestions);
+    console.log('Feedback:', feedback);
+    console.log('Milestones reached so far:', Array.from(milestonesReached));
+
+    // Calculate milestones
+    const milestones = [20, 40, 60, 80, 100];
+
+    for (const milestone of milestones) {
+      const questionsNeeded = Math.ceil((milestone / 100) * totalQuestions);
+
+      console.log(`Checking milestone ${milestone}%: need ${questionsNeeded} questions`);
+
+      // Check if we've reached this milestone
+      if (answeredQuestions >= questionsNeeded && !milestonesReached.has(milestone)) {
+        // Check if ALL questions answered so far (in order) are correct
+        // We need to check the first N questions by their order in the questions array
+        const firstNQuestions = attemptData.questions.slice(0, questionsNeeded);
+        console.log('First N questions:', firstNQuestions.map(q => q.questionId));
+
+        const allCorrectInMilestone = firstNQuestions.every(q => {
+          const isCorrect = feedback[q.questionId] === true;
+          console.log(`Question ${q.questionId}: ${isCorrect ? 'CORRECT' : 'WRONG/UNANSWERED'}`);
+          return isCorrect;
+        });
+
+        console.log(`All correct in milestone? ${allCorrectInMilestone}`);
+
+        if (allCorrectInMilestone) {
+          // Show celebration!
+          console.log('🎉 SHOWING CELEBRATION FOR MILESTONE:', milestone);
+          showMilestoneCelebration(milestone);
+          setMilestonesReached(prev => new Set([...prev, milestone]));
+          break; // Only show one milestone at a time
+        }
+      }
+    }
+  };
+
+  const showMilestoneCelebration = (milestone: number) => {
+    console.log('=== SHOW CELEBRATION ===');
+    console.log('User:', user);
+
+    // Get user's favorite sports stars from preferences
+    const preferences = (user as any)?.profile?.preferences;
+    console.log('Preferences:', preferences);
+
+    const favoriteSportsStars = preferences?.favoriteSportsStars || [];
+    console.log('Favorite sports stars:', favoriteSportsStars);
+
+    if (favoriteSportsStars.length === 0) {
+      // No sports stars selected, skip celebration
+      console.log('❌ No sports stars selected, skipping celebration');
+      return;
+    }
+
+    // Pick a random star from user's favorites
+    const randomStarId = favoriteSportsStars[Math.floor(Math.random() * favoriteSportsStars.length)];
+    console.log('Selected random star ID:', randomStarId);
+
+    const star = SPORTS_STARS.find(s => s.id === randomStarId);
+    console.log('Found star:', star);
+
+    if (star) {
+      console.log('✅ Setting celebration state');
+      setCurrentCelebratingStar(star);
+      setCurrentMilestone(milestone);
+      setShowCongratulations(true);
+    } else {
+      console.log('❌ Star not found in SPORTS_STARS array');
     }
   };
 
@@ -737,6 +833,16 @@ function TakeAssessment() {
           ))}
         </div>
       </div>
+
+      {/* Congratulatory Modal */}
+      {showCongratulations && currentCelebratingStar && (
+        <CongratulatoryModal
+          star={currentCelebratingStar}
+          milestone={currentMilestone}
+          isOpen={showCongratulations}
+          onClose={() => setShowCongratulations(false)}
+        />
+      )}
     </div>
   );
 }

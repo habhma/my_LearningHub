@@ -17,6 +17,7 @@ const userSelect = {
       schoolName: true,
       dateOfBirth: true,
       bio: true,
+      preferences: true,
     },
   },
 };
@@ -117,6 +118,7 @@ export class UserService {
       classLevel?: number;
       dateOfBirth?: string;
       bio?: string;
+      preferences?: any;
     }
   ) {
     console.log('=== updateOwnProfile Service ===');
@@ -149,6 +151,7 @@ export class UserService {
           dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
         }),
         ...(data.bio !== undefined && { bio: data.bio }),
+        ...(data.preferences !== undefined && { preferences: data.preferences }),
       },
     });
 
