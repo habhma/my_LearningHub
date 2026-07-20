@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { SportsStar, getCongratulatoryMessage } from '@/data/sportsStars';
 
 interface CongratulatoryModalProps {
@@ -10,6 +10,7 @@ interface CongratulatoryModalProps {
 
 function CongratulatoryModal({ star, milestone, isOpen, onClose }: CongratulatoryModalProps) {
   const [show, setShow] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Get celebration duration from environment variable (default to 5000ms if not set)
   const celebrationDuration = Number(import.meta.env.VITE_CELEBRATION_DURATION_MS) || 5000;
@@ -17,11 +18,28 @@ function CongratulatoryModal({ star, milestone, isOpen, onClose }: Congratulator
   useEffect(() => {
     if (isOpen) {
       setShow(true);
+
+      // Play celebration music
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().catch(err => {
+          console.log('Audio playback failed:', err);
+        });
+      }
+
       // Auto close after configured duration
       const timer = setTimeout(() => {
         handleClose();
       }, celebrationDuration);
-      return () => clearTimeout(timer);
+
+      return () => {
+        clearTimeout(timer);
+        // Stop music when modal closes
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+        }
+      };
     }
     return undefined;
   }, [isOpen, celebrationDuration]);
@@ -155,6 +173,13 @@ function CongratulatoryModal({ star, milestone, isOpen, onClose }: Congratulator
           </div>
         </div>
       </div>
+
+      {/* Audio element for celebration music */}
+      <audio
+        ref={audioRef}
+        src="/sounds/celebration.mp3"
+        preload="auto"
+      />
     </div>
   );
 }
