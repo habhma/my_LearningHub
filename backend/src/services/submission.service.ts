@@ -55,61 +55,21 @@ export class SubmissionService {
       throw new Error('This assessment has no questions yet');
     }
 
-    // Resume an existing in-progress attempt instead of creating a duplicate
+    // Check for any existing in-progress attempt and abandon it
     const existing = await prisma.testAttempt.findFirst({
       where: { testId, userId, status: AttemptStatus.IN_PROGRESS },
-      include: {
-        test: {
-          select: {
-            id: true,
-            testName: true,
-            testType: true,
-            testConfig: true,
-          },
-        },
-      },
     });
 
-    // Check if existing attempt has expired
     if (existing) {
-      const testDurationMinutes = (test.testConfig as any)?.duration || 60;
-      const testDurationMs = testDurationMinutes * 60 * 1000;
-      const elapsedMs = Date.now() - existing.startedAt.getTime();
-
-      // If time expired, auto-submit the old attempt
-      if (elapsedMs >= testDurationMs) {
-        await prisma.testAttempt.update({
-          where: { id: existing.id },
-          data: {
-            status: AttemptStatus.COMPLETED,
-            submittedAt: new Date(),
-            timeTakenSeconds: Math.round(elapsedMs / 1000),
-          },
-        });
-        // Don't return the expired attempt, create a new one below
-      } else {
-        // Valid in-progress attempt, return it
-        const maxScore = test.testQuestions.reduce((sum, tq) => sum + Number(tq.marks), 0);
-        return {
-          attempt: existing,
-          questions: test.testQuestions.map((tq) => ({
-            testQuestionId: tq.id.toString(),
-            questionId: tq.question.id.toString(),
-            questionOrder: tq.questionOrder,
-            marks: Number(tq.marks),
-            negativeMarks: Number(tq.negativeMarks),
-            questionText: tq.question.questionText,
-            questionImageUrl: tq.question.questionImageUrl,
-            type: tq.question.type,
-            options: tq.question.options.map((o) => ({
-              id: o.id.toString(),
-              optionText: o.optionText,
-              optionOrder: o.optionOrder,
-              isCorrect: o.isCorrect, // Include isCorrect for instant feedback
-            })),
-          })),
-        };
-      }
+      // Abandon the old attempt and create a fresh one
+      await prisma.testAttempt.update({
+        where: { id: existing.id },
+        data: {
+          status: AttemptStatus.ABANDONED,
+          submittedAt: new Date(),
+          timeTakenSeconds: Math.round((Date.now() - existing.startedAt.getTime()) / 1000),
+        },
+      });
     }
 
     const maxScore = test.testQuestions.reduce((sum, tq) => sum + Number(tq.marks), 0);

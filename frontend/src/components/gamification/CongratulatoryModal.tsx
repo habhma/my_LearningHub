@@ -11,6 +11,8 @@ interface CongratulatoryModalProps {
 function CongratulatoryModal({ star, milestone, isOpen, onClose }: CongratulatoryModalProps) {
   const [show, setShow] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
+  const [messages, setMessages] = useState<string[]>([]);
 
   // Get celebration duration from environment variable (default to 5000ms if not set)
   const celebrationDuration = Number(import.meta.env.VITE_CELEBRATION_DURATION_MS) || 5000;
@@ -18,6 +20,11 @@ function CongratulatoryModal({ star, milestone, isOpen, onClose }: Congratulator
   useEffect(() => {
     if (isOpen) {
       setShow(true);
+      setCurrentMessageIndex(0);
+
+      // Get 3 messages for this milestone
+      const congratsMessages = getCongratulatoryMessage(star.name, milestone);
+      setMessages(congratsMessages);
 
       // Play celebration music
       if (audioRef.current) {
@@ -42,7 +49,18 @@ function CongratulatoryModal({ star, milestone, isOpen, onClose }: Congratulator
       };
     }
     return undefined;
-  }, [isOpen, celebrationDuration]);
+  }, [isOpen, celebrationDuration, star.name, milestone]);
+
+  // Cycle through messages every 2 seconds
+  useEffect(() => {
+    if (!isOpen || messages.length === 0) return;
+
+    const messageInterval = setInterval(() => {
+      setCurrentMessageIndex((prev) => (prev + 1) % messages.length);
+    }, 2000); // Change message every 2 seconds
+
+    return () => clearInterval(messageInterval);
+  }, [isOpen, messages.length]);
 
   const handleClose = () => {
     setShow(false);
@@ -143,11 +161,30 @@ function CongratulatoryModal({ star, milestone, isOpen, onClose }: Congratulator
               {star.sport} • {star.country}
             </p>
 
-            {/* Message */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-600 rounded-xl p-4 mb-4">
-              <p className="text-lg font-semibold text-gray-800 dark:text-white">
-                {getCongratulatoryMessage(star.name, milestone)}
-              </p>
+            {/* Single Message with Transition */}
+            <div className="mb-4 min-h-[80px] flex items-center justify-center">
+              <div
+                key={currentMessageIndex}
+                className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-600 rounded-xl p-4 w-full animate-fadeIn"
+              >
+                <p className="text-lg font-semibold text-gray-800 dark:text-white">
+                  {messages[currentMessageIndex]}
+                </p>
+              </div>
+            </div>
+
+            {/* Message Counter */}
+            <div className="flex justify-center gap-2 mb-4">
+              {messages.map((_, index) => (
+                <div
+                  key={index}
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    index === currentMessageIndex
+                      ? 'w-8 bg-gradient-to-r from-blue-500 to-indigo-500'
+                      : 'w-2 bg-gray-300 dark:bg-gray-600'
+                  }`}
+                />
+              ))}
             </div>
 
             {/* Quote */}
