@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { submissionService } from '@/services/submissionService';
 import { StartAttemptResponse } from '@/types';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
 import { soundManager } from '@/utils/sounds';
 import { useAuthStore } from '@/store/authStore';
 import { SPORTS_STARS, SportsStar } from '@/data/sportsStars';
@@ -23,6 +24,10 @@ function TakeAssessment() {
   const [savingQuestionId, setSavingQuestionId] = useState<string | null>(null);
   const [testStarted, setTestStarted] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0); // NEW: Track current question
+
+  // Navigation confirmation dialog state
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
 
   // Gamification state
   const [showCongratulations, setShowCongratulations] = useState(false);
@@ -135,6 +140,83 @@ function TakeAssessment() {
       }
     };
   }, [attemptData, testStarted, timeRemaining]);
+
+  // Warn before closing/refreshing browser tab or navigating away
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (testStarted && !submitting) {
+        e.preventDefault();
+        e.returnValue = 'Are you sure you want to leave? Your assessment progress will be abandoned and the timer will reset.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [testStarted, submitting]);
+
+  // Block internal navigation (to other pages within the app)
+  useEffect(() => {
+    if (!testStarted || submitting) return;
+
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const link = target.closest('a');
+
+      if (link && link.href && !link.href.startsWith(window.location.origin + window.location.pathname)) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Show custom dialog instead of browser confirm
+        setPendingNavigation(() => () => {
+          window.location.href = link.href;
+        });
+        setShowConfirmDialog(true);
+      }
+    };
+
+    // Also handle browser back/forward buttons
+    const handlePopState = (e: PopStateEvent) => {
+      e.preventDefault();
+
+      // Show custom dialog instead of browser confirm
+      setPendingNavigation(() => () => {
+        window.history.back();
+      });
+      setShowConfirmDialog(true);
+
+      // Push the current state back to prevent immediate navigation
+      window.history.pushState(null, '', window.location.href);
+    };
+
+    // Push initial state
+    window.history.pushState(null, '', window.location.href);
+
+    document.addEventListener('click', handleClick, true);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      document.removeEventListener('click', handleClick, true);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [testStarted, submitting]);
+
+  // Handle dialog confirmation
+  const handleConfirmNavigation = () => {
+    setShowConfirmDialog(false);
+    if (pendingNavigation) {
+      pendingNavigation();
+      setPendingNavigation(null);
+    }
+  };
+
+  const handleCancelNavigation = () => {
+    setShowConfirmDialog(false);
+    setPendingNavigation(null);
+  };
 
   const handleAutoSubmit = async (attemptId: string) => {
     try {
@@ -847,6 +929,17 @@ function TakeAssessment() {
           onClose={() => setShowCongratulations(false)}
         />
       )}
+
+      {/* Navigation Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showConfirmDialog}
+        title="⚠️ Leave Assessment?"
+        message="Are you sure you want to leave this assessment? Your progress will be abandoned and the timer will reset if you come back."
+        confirmText="Yes, Leave"
+        cancelText="Stay Here"
+        onConfirm={handleConfirmNavigation}
+        onCancel={handleCancelNavigation}
+      />
     </div>
   );
 }

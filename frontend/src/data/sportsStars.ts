@@ -104,20 +104,81 @@ export const SPORTS_STARS: SportsStar[] = [
   }
 ];
 
-// Helper function to get random congratulatory messages
-export const getCongratulatoryMessage = (starName: string, milestone: number): string => {
-  const messages: string[] = [
-    `${starName} says: "Amazing! You're on fire! 🔥"`,
-    `${starName} cheers: "Keep up the excellent work! 🌟"`,
-    `${starName} applauds: "You're unstoppable! 💪"`,
-    `${starName} celebrates: "Brilliant performance! 🎉"`,
-    `${starName} motivates: "You're crushing it! 🚀"`,
-  ];
+// Comprehensive congratulatory messages pool (50+ messages)
+const CONGRATULATORY_MESSAGES = [
+  "Amazing! You're on fire! 🔥",
+  "Keep up the excellent work! 🌟",
+  "You're unstoppable! 💪",
+  "Brilliant performance! 🎉",
+  "You're crushing it! 🚀",
+  "Outstanding effort! Keep going! ⭐",
+  "You're doing fantastic! 🎯",
+  "Incredible progress! 💫",
+  "You're a natural! Keep it up! 🏅",
+  "Superb work! Stay focused! 👏",
+  "You're making this look easy! 😎",
+  "Phenomenal job! 🌈",
+  "You're in the zone! 🎪",
+  "Spectacular performance! 🎭",
+  "You're absolutely nailing it! 🔨",
+  "Magnificent work! 🎨",
+  "You're showing true excellence! 💎",
+  "Brilliant execution! 🎬",
+  "You're proving your talent! 🎸",
+  "Impressive dedication! 📚",
+  "You're breaking barriers! 🚧",
+  "Exceptional skills on display! 🎓",
+  "You're setting the pace! 🏃",
+  "Remarkable consistency! ⚡",
+  "You're exceeding expectations! 📈",
+  "Wonderful progress! 🌺",
+  "You're showing champion spirit! 🏆",
+  "Fantastic momentum! 🌊",
+  "You're in top form! 💯",
+  "Stellar performance! ✨",
+  "You're demonstrating mastery! 🎯",
+  "Awesome concentration! 🧠",
+  "You're performing brilliantly! 🌟",
+  "Great determination! 💪",
+  "You're showing real grit! 🔥",
+  "Marvelous execution! 🎪",
+  "You're on the right track! 🛤️",
+  "Excellent work ethic! 📖",
+  "You're proving your worth! 💰",
+  "Tremendous effort! 🏋️",
+  "You're conquering this! ⚔️",
+  "Impressive precision! 🎯",
+  "You're showcasing talent! 🎭",
+  "Powerful performance! ⚡",
+  "You're making every answer count! 📊",
+  "Dynamic effort! 💥",
+  "You're in championship form! 🥇",
+  "Inspiring performance! 🌅",
+  "You're climbing to the top! 🧗",
+  "Extraordinary focus! 👁️",
+  "You're writing your success story! 📝",
+  "Brilliant strategic thinking! 🧩",
+  "You're unstoppable today! 🌪️",
+  "Remarkable perseverance! 🌳",
+];
 
+const MILESTONE_100_MESSAGES = [
+  "PERFECT SCORE! You're a CHAMPION! 🏆🎉",
+  "FLAWLESS VICTORY! Absolutely LEGENDARY! 👑✨",
+  "100%! You're INCREDIBLE! A TRUE MASTER! 🌟💯",
+  "PERFECTION! You've achieved GREATNESS! 🎆🏅",
+  "OUTSTANDING! You're a SUPERSTAR! 🌠🎊",
+];
+
+// Helper function to get 3 random congratulatory messages
+export const getCongratulatoryMessage = (starName: string, milestone: number): string[] => {
   if (milestone === 100) {
-    return `${starName} celebrates: "PERFECT SCORE! You're a CHAMPION! 🏆🎉"`;
+    // For 100%, pick 3 random messages from the perfect score pool
+    const shuffled = [...MILESTONE_100_MESSAGES].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 3).map(msg => `${starName} celebrates: "${msg}"`);
   }
 
-  const randomIndex = Math.floor(Math.random() * messages.length);
-  return messages[randomIndex] ?? messages[0] ?? `${starName} says: "Great job!"`;
+  // For other milestones, pick 3 random messages from the general pool
+  const shuffled = [...CONGRATULATORY_MESSAGES].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, 3).map(msg => `${starName} says: "${msg}"`);
 };
