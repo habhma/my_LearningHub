@@ -19,6 +19,7 @@ const TakeAssessment = lazy(() => import('@/pages/student/TakeAssessment'));
 const StudentResults = lazy(() => import('@/pages/student/Results'));
 const ResultDetail = lazy(() => import('@/pages/student/ResultDetail'));
 const StudentProfile = lazy(() => import('@/pages/student/Profile'));
+const SelectSportsStars = lazy(() => import('@/pages/student/SelectSportsStars'));
 
 // Admin pages
 const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'));
@@ -119,6 +120,14 @@ function AppRoutes() {
               <DashboardLayout>
                 <StudentProfile />
               </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/student/select-sports-stars"
+          element={
+            <ProtectedRoute allowedRoles={[UserRole.STUDENT]}>
+              <SelectSportsStars />
             </ProtectedRoute>
           }
         />

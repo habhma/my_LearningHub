@@ -26,9 +26,26 @@ function Login() {
     setIsLoading(true);
     try {
       await login(data.email, data.password);
+
+      // Fetch full user data with preferences after login
+      await useAuthStore.getState().refreshUser();
+
       toast.success('Login successful!');
 
       const user = useAuthStore.getState().user;
+
+      // Check if student needs to select sports stars (first-time gamification setup)
+      if (user?.role === 'STUDENT') {
+        const preferences = (user as any)?.profile?.preferences;
+        const hasSportsStars = preferences?.favoriteSportsStars && preferences.favoriteSportsStars.length > 0;
+
+        if (!hasSportsStars) {
+          // First time - redirect to sports stars selection
+          navigate('/student/select-sports-stars');
+          return;
+        }
+      }
+
       const redirectPath = user?.role === 'ADMIN' ? '/admin' : '/student';
       navigate(redirectPath);
     } catch (error: any) {
