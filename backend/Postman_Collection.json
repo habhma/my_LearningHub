@@ -1,0 +1,274 @@
+{
+  "info": {
+    "name": "Student Assessment Platform API",
+    "description": "API collection for testing the assessment platform",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "studentToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "assessmentId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register Admin",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"Admin123!\",\n  \"fullName\": \"Admin User\",\n  \"role\": \"ADMIN\",\n  \"classLevel\": 12\n}"
+            }
+          }
+        },
+        {
+          "name": "Register Student",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"student@example.com\",\n  \"password\": \"Student123!\",\n  \"fullName\": \"Student User\",\n  \"role\": \"STUDENT\",\n  \"classLevel\": 10\n}"
+            }
+          }
+        },
+        {
+          "name": "Login Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.collectionVariables.set(\"adminToken\", jsonData.data.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"Admin123!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login Student",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.collectionVariables.set(\"studentToken\", jsonData.data.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"student@example.com\",\n  \"password\": \"Student123!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{adminToken}}"}],
+            "url": "{{baseUrl}}/users/me"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Assessments (Admin)",
+      "item": [
+        {
+          "name": "Create Assessment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.collectionVariables.set(\"assessmentId\", jsonData.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Authorization", "value": "Bearer {{adminToken}}"}
+            ],
+            "url": "{{baseUrl}}/assessments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"testName\": \"Mathematics Final Exam\",\n  \"testType\": \"MOCK\",\n  \"testConfig\": {\n    \"duration\": 120,\n    \"totalMarks\": 100,\n    \"passingMarks\": 40,\n    \"showResults\": true,\n    \"shuffleQuestions\": false,\n    \"allowReview\": true\n  },\n  \"classLevel\": 10,\n  \"accessLevel\": \"FREE\",\n  \"isActive\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Practice Test",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Authorization", "value": "Bearer {{adminToken}}"}
+            ],
+            "url": "{{baseUrl}}/assessments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"testName\": \"Quick Math Practice\",\n  \"testType\": \"PRACTICE\",\n  \"testConfig\": {\n    \"duration\": 30,\n    \"totalMarks\": 20,\n    \"showResults\": true\n  },\n  \"classLevel\": 10,\n  \"accessLevel\": \"FREE\",\n  \"isActive\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "List All Assessments",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{adminToken}}"}],
+            "url": {
+              "raw": "{{baseUrl}}/assessments?page=1&limit=10",
+              "query": [
+                {"key": "page", "value": "1"},
+                {"key": "limit", "value": "10"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filter by Type (MOCK)",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{adminToken}}"}],
+            "url": {
+              "raw": "{{baseUrl}}/assessments?testType=MOCK",
+              "query": [{"key": "testType", "value": "MOCK"}]
+            }
+          }
+        },
+        {
+          "name": "Get Assessment by ID",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{adminToken}}"}],
+            "url": "{{baseUrl}}/assessments/{{assessmentId}}"
+          }
+        },
+        {
+          "name": "Update Assessment",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Authorization", "value": "Bearer {{adminToken}}"}
+            ],
+            "url": "{{baseUrl}}/assessments/{{assessmentId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"testName\": \"Mathematics Final Exam - Updated\",\n  \"testConfig\": {\n    \"duration\": 150,\n    \"totalMarks\": 100,\n    \"passingMarks\": 50\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "Duplicate Assessment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Authorization", "value": "Bearer {{adminToken}}"}
+            ],
+            "url": "{{baseUrl}}/assessments/{{assessmentId}}/duplicate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newName\": \"Mathematics Final Exam - Copy\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Assessment",
+          "request": {
+            "method": "DELETE",
+            "header": [{"key": "Authorization", "value": "Bearer {{adminToken}}"}],
+            "url": "{{baseUrl}}/assessments/{{assessmentId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Assessments (Student)",
+      "item": [
+        {
+          "name": "List Available Assessments",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{studentToken}}"}],
+            "url": "{{baseUrl}}/assessments"
+          }
+        },
+        {
+          "name": "View Assessment Details",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{studentToken}}"}],
+            "url": "{{baseUrl}}/assessments/{{assessmentId}}"
+          }
+        },
+        {
+          "name": "Try Create (Should Fail)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Authorization", "value": "Bearer {{studentToken}}"}
+            ],
+            "url": "{{baseUrl}}/assessments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"testName\": \"Unauthorized Test\",\n  \"testType\": \"PRACTICE\",\n  \"testConfig\": {}\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:5000/health"
+      }
+    }
+  ]
+}

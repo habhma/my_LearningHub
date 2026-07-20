@@ -1,0 +1,2239 @@
+openapi: 3.0.3
+info:
+  title: Student Assessment Platform API
+  description: |
+    REST API for the Student Assessment Platform - an educational web application for students (Class 1-10)
+    to practice and excel in CBSE/ICSE board exams and competitive exams like Math Olympiad.
+
+    ## Features
+    - Practice and Mock Test modes
+    - Gamification (badges, points, leaderboards)
+    - Subscription management
+    - Comprehensive admin panel
+    - Configuration-driven content (add exams/subjects without code changes)
+
+    ## Authentication
+    All protected endpoints require JWT authentication. Include the access token in the Authorization header:
+    ```
+    Authorization: Bearer <access_token>
+    ```
+
+    ## Rate Limiting
+    - Authentication endpoints: 5 requests per 15 minutes
+    - Student endpoints: 120 requests per minute
+    - Admin endpoints: 300 requests per minute
+
+    ## Pagination
+    List endpoints support pagination using `page` and `limit` query parameters.
+    Default: `page=1`, `limit=20`, Max: `limit=100`
+
+    ## Error Handling
+    All errors follow a standard format with `success: false`, `error` object containing `code` and `message`,
+    and optional `details` array for validation errors.
+
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@studentassessment.com
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://api.studentassessment.com/api/v1
+    description: Production server
+  - url: https://staging-api.studentassessment.com/api/v1
+    description: Staging server
+  - url: http://localhost:3000/api/v1
+    description: Development server
+
+tags:
+  - name: Authentication
+    description: User authentication and session management
+  - name: Users
+    description: User profile management
+  - name: Questions
+    description: Question bank management (admin + student access)
+  - name: Tests
+    description: Practice and mock test management
+  - name: Subscriptions
+    description: Subscription plans and payment management
+  - name: Gamification
+    description: Leaderboards, badges, and points system
+  - name: Admin
+    description: Admin-only endpoints for platform management
+  - name: Configuration
+    description: Platform configuration (boards, subjects, categories)
+
+paths:
+  # ==========================================
+  # AUTHENTICATION ENDPOINTS
+  # ==========================================
+
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register new user
+      description: Create a new student account with email verification
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - fullName
+                - classLevel
+                - boardId
+                - schoolName
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: student@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: SecurePass123!
+                fullName:
+                  type: string
+                  minLength: 2
+                  maxLength: 255
+                  example: John Doe
+                classLevel:
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+                  example: 8
+                boardId:
+                  type: integer
+                  example: 1
+                schoolName:
+                  type: string
+                  maxLength: 255
+                  example: Delhi Public School
+                parentEmail:
+                  type: string
+                  format: email
+                  description: Required for students below age 8 (Class 1-3)
+                  example: parent@example.com
+                parentPhone:
+                  type: string
+                  pattern: '^\+?[1-9]\d{9,14}$'
+                  example: "+919876543210"
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Registration successful. Please verify your email.
+                  data:
+                    type: object
+                    properties:
+                      userId:
+                        type: integer
+                        example: 123
+                      email:
+                        type: string
+                        example: student@example.com
+                      fullName:
+                        type: string
+                        example: John Doe
+                      emailVerificationSent:
+                        type: boolean
+                        example: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                error:
+                  code: EMAIL_EXISTS
+                  message: An account with this email already exists
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user and return JWT tokens
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: student@example.com
+                password:
+                  type: string
+                  format: password
+                  example: SecurePass123!
+      responses:
+        '200':
+          description: Login successful
+          headers:
+            Set-Cookie:
+              description: httpOnly cookies containing access and refresh tokens
+              schema:
+                type: string
+                example: accessToken=eyJhbG...; Path=/; HttpOnly; Secure; SameSite=Strict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Login successful
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+                      accessToken:
+                        type: string
+                        description: JWT access token (15 min expiry)
+                        example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+                      refreshToken:
+                        type: string
+                        description: JWT refresh token (7 day expiry)
+                        example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+                      expiresIn:
+                        type: integer
+                        description: Access token expiry in seconds
+                        example: 900
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                error:
+                  code: INVALID_CREDENTIALS
+                  message: Invalid email or password
+        '423':
+          description: Account locked due to multiple failed attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                error:
+                  code: ACCOUNT_LOCKED
+                  message: Account locked for 30 minutes due to multiple failed login attempts
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: User logout
+      description: Invalidate refresh token and clear session
+      operationId: logoutUser
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Logout successful
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: Get new access token using refresh token
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+                  description: JWT refresh token from login
+                  example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      accessToken:
+                        type: string
+                        example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+                      refreshToken:
+                        type: string
+                        description: New refresh token (rotated)
+                        example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+                      expiresIn:
+                        type: integer
+                        example: 900
+        '401':
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                error:
+                  code: INVALID_REFRESH_TOKEN
+                  message: Refresh token is invalid or expired
+
+  /auth/verify-email:
+    post:
+      tags:
+        - Authentication
+      summary: Verify email address
+      description: Verify user email using token sent via email
+      operationId: verifyEmail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  description: Email verification token from email link
+                  example: abc123def456ghi789
+      responses:
+        '200':
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Email verified successfully
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                error:
+                  code: INVALID_TOKEN
+                  message: Email verification token is invalid or expired
+
+  /auth/forgot-password:
+    post:
+      tags:
+        - Authentication
+      summary: Request password reset
+      description: Send password reset link to user email
+      operationId: forgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: student@example.com
+      responses:
+        '200':
+          description: Password reset email sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Password reset link sent to your email
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /auth/reset-password:
+    post:
+      tags:
+        - Authentication
+      summary: Reset password
+      description: Reset password using token from email
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+                - newPassword
+              properties:
+                token:
+                  type: string
+                  description: Password reset token from email
+                  example: xyz789abc123def456
+                newPassword:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: NewSecurePass123!
+      responses:
+        '200':
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Password reset successful. Please login with your new password.
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                error:
+                  code: INVALID_TOKEN
+                  message: Password reset token is invalid or expired
+
+  # ==========================================
+  # USER & PROFILE ENDPOINTS
+  # ==========================================
+
+  /users/profile:
+    get:
+      tags:
+        - Users
+      summary: Get user profile
+      description: Get current user's profile information
+      operationId: getUserProfile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags:
+        - Users
+      summary: Update user profile
+      description: Update current user's profile information
+      operationId: updateUserProfile
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName:
+                  type: string
+                  maxLength: 255
+                  example: John Doe Updated
+                schoolName:
+                  type: string
+                  maxLength: 255
+                  example: New Delhi Public School
+                classLevel:
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+                  example: 9
+                boardId:
+                  type: integer
+                  example: 1
+                bio:
+                  type: string
+                  maxLength: 500
+                  example: Aspiring mathematician, love solving olympiad problems
+                preferences:
+                  type: object
+                  description: User preferences (theme, notifications, etc.)
+                  example:
+                    theme: dark
+                    emailNotifications: true
+                    practiceReminders: true
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Profile updated successfully
+                  data:
+                    $ref: '#/components/schemas/UserProfile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/change-password:
+    post:
+      tags:
+        - Users
+      summary: Change password
+      description: Change current user's password
+      operationId: changePassword
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - currentPassword
+                - newPassword
+              properties:
+                currentPassword:
+                  type: string
+                  format: password
+                  example: OldPassword123!
+                newPassword:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: NewPassword456!
+      responses:
+        '200':
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Password changed successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Current password is incorrect
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                error:
+                  code: INVALID_PASSWORD
+                  message: Current password is incorrect
+
+  /users/avatar:
+    post:
+      tags:
+        - Users
+      summary: Upload profile avatar
+      description: Upload user profile image (max 5MB, jpg/png only)
+      operationId: uploadAvatar
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - avatar
+              properties:
+                avatar:
+                  type: string
+                  format: binary
+                  description: Image file (max 5MB)
+      responses:
+        '200':
+          description: Avatar uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Avatar uploaded successfully
+                  data:
+                    type: object
+                    properties:
+                      avatarUrl:
+                        type: string
+                        example: https://cdn.studentassessment.com/avatars/123-abc.jpg
+        '400':
+          description: Invalid file type or size
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                error:
+                  code: INVALID_FILE
+                  message: File must be jpg or png and less than 5MB
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==========================================
+  # QUESTION ENDPOINTS
+  # ==========================================
+
+  /questions:
+    get:
+      tags:
+        - Questions
+      summary: List questions
+      description: Get paginated list of questions with filters (Student sees only accessible, Admin sees all)
+      operationId: listQuestions
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: subjectId
+          in: query
+          schema:
+            type: integer
+          description: Filter by subject ID
+          example: 1
+        - name: topicId
+          in: query
+          schema:
+            type: integer
+          description: Filter by topic ID
+          example: 5
+        - name: classLevel
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+          description: Filter by class level
+          example: 8
+        - name: difficultyId
+          in: query
+          schema:
+            type: integer
+          description: Filter by difficulty level ID
+          example: 2
+        - name: examCategoryId
+          in: query
+          schema:
+            type: integer
+          description: Filter by exam category ID
+          example: 1
+        - name: typeId
+          in: query
+          schema:
+            type: integer
+          description: Filter by question type ID
+          example: 1
+        - name: tags
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          description: Filter by tags (comma-separated)
+          example: algebra,word-problem
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search in question text
+          example: quadratic equation
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [created_at, difficulty, success_rate, random]
+          description: Sort field
+          example: created_at
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+          description: Sort order
+          example: desc
+      responses:
+        '200':
+          description: Questions retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      questions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/QuestionSummary'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Questions
+      summary: Create question (Admin only)
+      description: Create a new question with options and explanation
+      operationId: createQuestion
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionCreate'
+      responses:
+        '201':
+          description: Question created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Question created successfully
+                  data:
+                    type: object
+                    properties:
+                      questionId:
+                        type: integer
+                        example: 456
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /questions/{questionId}:
+    get:
+      tags:
+        - Questions
+      summary: Get question details
+      description: Get full question details including options and explanation (if answered wrong)
+      operationId: getQuestion
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: questionId
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Question ID
+          example: 456
+      responses:
+        '200':
+          description: Question retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/QuestionDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Access denied (subscription required)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                error:
+                  code: ACCESS_DENIED
+                  message: Subscribe to access this question
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Questions
+      summary: Update question (Admin only)
+      description: Update existing question
+      operationId: updateQuestion
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: questionId
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Question ID
+          example: 456
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionCreate'
+      responses:
+        '200':
+          description: Question updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Question updated successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Questions
+      summary: Delete question (Admin only)
+      description: Soft delete a question (marks as deleted, doesn't remove from DB)
+      operationId: deleteQuestion
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: questionId
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Question ID
+          example: 456
+      responses:
+        '200':
+          description: Question deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Question deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /questions/{questionId}/report:
+    post:
+      tags:
+        - Questions
+      summary: Report question issue
+      description: Report a problem with a question (incorrect answer, typo, unclear)
+      operationId: reportQuestion
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: questionId
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Question ID
+          example: 456
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reportType
+                - description
+              properties:
+                reportType:
+                  type: string
+                  enum: [incorrect_answer, unclear_question, typo, technical_issue, other]
+                  example: incorrect_answer
+                description:
+                  type: string
+                  minLength: 10
+                  maxLength: 1000
+                  example: The correct answer should be option B, not option C
+      responses:
+        '201':
+          description: Report submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Report submitted successfully. Thank you for your feedback!
+                  data:
+                    type: object
+                    properties:
+                      reportId:
+                        type: integer
+                        example: 789
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==========================================
+  # TEST ENDPOINTS (Selected key endpoints)
+  # ==========================================
+
+  /tests/practice:
+    post:
+      tags:
+        - Tests
+      summary: Create practice session
+      description: Create a new practice session with selected criteria
+      operationId: createPracticeTest
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - subjectId
+                - questionCount
+              properties:
+                subjectId:
+                  type: integer
+                  example: 1
+                topicIds:
+                  type: array
+                  items:
+                    type: integer
+                  example: [1, 2, 3]
+                difficultyId:
+                  type: integer
+                  description: If not specified, mixed difficulty
+                  example: 2
+                questionCount:
+                  type: integer
+                  minimum: 5
+                  maximum: 100
+                  example: 20
+      responses:
+        '201':
+          description: Practice session created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Practice session created successfully
+                  data:
+                    type: object
+                    properties:
+                      attemptId:
+                        type: integer
+                        example: 1001
+                      testId:
+                        type: integer
+                        example: 5001
+                      totalQuestions:
+                        type: integer
+                        example: 20
+                      questions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/QuestionDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Insufficient subscription access
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /tests/mock:
+    post:
+      tags:
+        - Tests
+      summary: Create mock test
+      description: Create a mock test (timed, structured)
+      operationId: createMockTest
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                testTemplateId:
+                  type: integer
+                  description: Pre-configured test template ID (admin-created)
+                  example: 10
+                customConfig:
+                  type: object
+                  description: Custom test configuration (if not using template)
+                  properties:
+                    subjectId:
+                      type: integer
+                      example: 1
+                    durationMinutes:
+                      type: integer
+                      example: 120
+                    questionCount:
+                      type: integer
+                      example: 40
+                    difficultyDistribution:
+                      type: object
+                      properties:
+                        easy:
+                          type: integer
+                          example: 10
+                        medium:
+                          type: integer
+                          example: 20
+                        hard:
+                          type: integer
+                          example: 10
+      responses:
+        '201':
+          description: Mock test created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      attemptId:
+                        type: integer
+                        example: 2001
+                      testId:
+                        type: integer
+                        example: 6001
+                      durationMinutes:
+                        type: integer
+                        example: 120
+                      startedAt:
+                        type: string
+                        format: date-time
+                        example: "2026-07-18T10:00:00Z"
+                      expiresAt:
+                        type: string
+                        format: date-time
+                        example: "2026-07-18T12:00:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tests/attempts/{attemptId}/submit:
+    post:
+      tags:
+        - Tests
+      summary: Submit test
+      description: Submit complete test attempt with all answers
+      operationId: submitTest
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: attemptId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - responses
+              properties:
+                responses:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - questionId
+                    properties:
+                      questionId:
+                        type: integer
+                        example: 456
+                      selectedOptionId:
+                        type: integer
+                        description: For MCQ/True-False
+                        example: 1823
+                      selectedOptionIds:
+                        type: array
+                        items:
+                          type: integer
+                        description: For MSQ
+                        example: [1823, 1824]
+                      textAnswer:
+                        type: string
+                        description: For SUBJECTIVE/NUMERICAL
+                        example: "42"
+                      timeTakenSeconds:
+                        type: integer
+                        example: 120
+                      markedForReview:
+                        type: boolean
+                        example: false
+      responses:
+        '200':
+          description: Test submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Test submitted successfully
+                  data:
+                    $ref: '#/components/schemas/TestResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==========================================
+  # GAMIFICATION ENDPOINTS
+  # ==========================================
+
+  /leaderboard:
+    get:
+      tags:
+        - Gamification
+      summary: Get leaderboard
+      description: Get leaderboard rankings (class-wise, school-wise, or global)
+      operationId: getLeaderboard
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [class, school, global]
+          description: Leaderboard type
+          example: class
+        - name: classLevel
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+          description: Required if type=class
+          example: 8
+        - name: schoolName
+          in: query
+          schema:
+            type: string
+          description: Required if type=school
+          example: Delhi Public School
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Leaderboard retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      leaderboard:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            rank:
+                              type: integer
+                              example: 1
+                            userId:
+                              type: integer
+                              example: 123
+                            fullName:
+                              type: string
+                              example: John Doe
+                            schoolName:
+                              type: string
+                              example: Delhi Public School
+                            totalPoints:
+                              type: integer
+                              example: 5420
+                            badgesEarned:
+                              type: integer
+                              example: 12
+                            avatarUrl:
+                              type: string
+                              nullable: true
+                              example: https://cdn.studentassessment.com/avatars/123.jpg
+                      currentUserRank:
+                        type: integer
+                        description: Current user's rank in this leaderboard
+                        example: 15
+                      totalUsers:
+                        type: integer
+                        example: 250
+                      lastUpdated:
+                        type: string
+                        format: date-time
+                        example: "2026-07-18T10:30:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /gamification/badges:
+    get:
+      tags:
+        - Gamification
+      summary: Get user badges
+      description: Get all badges earned by current user
+      operationId: getUserBadges
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Badges retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      badges:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            badgeId:
+                              type: integer
+                              example: 1
+                            badgeName:
+                              type: string
+                              example: 7-Day Streak
+                            badgeCode:
+                              type: string
+                              example: STREAK_7
+                            description:
+                              type: string
+                              example: Practice for 7 consecutive days
+                            iconUrl:
+                              type: string
+                              example: https://cdn.studentassessment.com/badges/streak_7.svg
+                            rarity:
+                              type: string
+                              enum: [common, rare, epic, legendary]
+                              example: rare
+                            earnedAt:
+                              type: string
+                              format: date-time
+                              example: "2026-07-15T14:30:00Z"
+                      totalBadges:
+                        type: integer
+                        example: 8
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /gamification/points:
+    get:
+      tags:
+        - Gamification
+      summary: Get points balance
+      description: Get current user's points balance and transaction history
+      operationId: getPointsBalance
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Points balance retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      currentBalance:
+                        type: integer
+                        example: 3250
+                      totalEarned:
+                        type: integer
+                        example: 5000
+                      totalRedeemed:
+                        type: integer
+                        example: 1750
+                      transactions:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            transactionId:
+                              type: integer
+                              example: 10001
+                            points:
+                              type: integer
+                              description: Positive for earn, negative for redeem
+                              example: 10
+                            transactionType:
+                              type: string
+                              example: correct_answer
+                            description:
+                              type: string
+                              example: Answered question correctly
+                            balanceAfter:
+                              type: integer
+                              example: 3250
+                            createdAt:
+                              type: string
+                              format: date-time
+                              example: "2026-07-18T09:15:00Z"
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /gamification/points/redeem:
+    post:
+      tags:
+        - Gamification
+      summary: Redeem points
+      description: Redeem points to unlock additional content (max 20% of payment made)
+      operationId: redeemPoints
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - itemType
+                - itemId
+                - points
+              properties:
+                itemType:
+                  type: string
+                  enum: [mock_test, question_pack, explanation]
+                  example: mock_test
+                itemId:
+                  type: integer
+                  example: 1001
+                points:
+                  type: integer
+                  minimum: 1
+                  example: 500
+      responses:
+        '200':
+          description: Points redeemed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Points redeemed successfully
+                  data:
+                    type: object
+                    properties:
+                      transactionId:
+                        type: integer
+                        example: 10002
+                      pointsRedeemed:
+                        type: integer
+                        example: 500
+                      newBalance:
+                        type: integer
+                        example: 2750
+                      itemUnlocked:
+                        type: object
+                        properties:
+                          type:
+                            type: string
+                            example: mock_test
+                          id:
+                            type: integer
+                            example: 1001
+                          name:
+                            type: string
+                            example: Class 8 Math Olympiad Mock 2
+        '400':
+          description: Insufficient points or redemption limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                error:
+                  code: INSUFFICIENT_POINTS
+                  message: You don't have enough points for this redemption
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==========================================
+  # ADMIN ENDPOINTS (Selected)
+  # ==========================================
+
+  /admin/dashboard/stats:
+    get:
+      tags:
+        - Admin
+      summary: Get dashboard statistics (Admin only)
+      description: Get key metrics for admin dashboard
+      operationId: getAdminDashboardStats
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Dashboard stats retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      users:
+                        type: object
+                        properties:
+                          totalUsers:
+                            type: integer
+                            example: 5234
+                          newToday:
+                            type: integer
+                            example: 42
+                          newThisWeek:
+                            type: integer
+                            example: 287
+                          activeUsers:
+                            type: integer
+                            example: 3891
+                      questions:
+                        type: object
+                        properties:
+                          totalQuestions:
+                            type: integer
+                            example: 1250
+                          activeQuestions:
+                            type: integer
+                            example: 1180
+                          flaggedQuestions:
+                            type: integer
+                            example: 15
+                          pendingReports:
+                            type: integer
+                            example: 8
+                      tests:
+                        type: object
+                        properties:
+                          testsCompletedToday:
+                            type: integer
+                            example: 156
+                          testsCompletedThisWeek:
+                            type: integer
+                            example: 1024
+                          avgCompletionRate:
+                            type: number
+                            format: float
+                            example: 87.5
+                      revenue:
+                        type: object
+                        properties:
+                          totalRevenue:
+                            type: number
+                            format: float
+                            example: 125000.00
+                          revenueThisMonth:
+                            type: number
+                            format: float
+                            example: 18500.00
+                          activeSubscriptions:
+                            type: integer
+                            example: 892
+                          conversionRate:
+                            type: number
+                            format: float
+                            example: 12.3
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/configuration/subjects:
+    get:
+      tags:
+        - Configuration
+      summary: List all subjects (Admin)
+      description: Get all subjects including inactive ones
+      operationId: listSubjects
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Subjects retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      subjects:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            subjectId:
+                              type: integer
+                              example: 1
+                            subjectName:
+                              type: string
+                              example: Mathematics
+                            subjectCode:
+                              type: string
+                              example: MATH
+                            description:
+                              type: string
+                              example: All mathematical topics
+                            colorHex:
+                              type: string
+                              example: "#FF6B6B"
+                            isActive:
+                              type: boolean
+                              example: true
+                            displayOrder:
+                              type: integer
+                              example: 1
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags:
+        - Configuration
+      summary: Create new subject (Admin only)
+      description: Add a new subject to the platform (configuration-driven)
+      operationId: createSubject
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - subjectName
+                - subjectCode
+              properties:
+                subjectName:
+                  type: string
+                  maxLength: 100
+                  example: Science
+                subjectCode:
+                  type: string
+                  maxLength: 50
+                  example: SCIENCE
+                description:
+                  type: string
+                  example: Physics, Chemistry, Biology
+                colorHex:
+                  type: string
+                  pattern: '^#[0-9A-Fa-f]{6}$'
+                  example: "#4CAF50"
+                displayOrder:
+                  type: integer
+                  example: 2
+      responses:
+        '201':
+          description: Subject created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Subject created successfully
+                  data:
+                    type: object
+                    properties:
+                      subjectId:
+                        type: integer
+                        example: 2
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Subject code already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access token obtained from login endpoint
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Page number for pagination
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      example: 1
+
+    LimitParam:
+      name: limit
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      example: 20
+
+  schemas:
+    User:
+      type: object
+      properties:
+        userId:
+          type: integer
+          example: 123
+        email:
+          type: string
+          format: email
+          example: student@example.com
+        role:
+          type: string
+          enum: [student, admin, teacher, parent]
+          example: student
+        emailVerified:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-06-15T10:30:00Z"
+
+    UserProfile:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            fullName:
+              type: string
+              example: John Doe
+            schoolName:
+              type: string
+              example: Delhi Public School
+            classLevel:
+              type: integer
+              example: 8
+            boardId:
+              type: integer
+              example: 1
+            boardName:
+              type: string
+              example: CBSE
+            parentEmail:
+              type: string
+              nullable: true
+              example: parent@example.com
+            avatarUrl:
+              type: string
+              nullable: true
+              example: https://cdn.studentassessment.com/avatars/123.jpg
+            bio:
+              type: string
+              nullable: true
+              example: Love solving math problems
+            preferences:
+              type: object
+              example:
+                theme: dark
+                emailNotifications: true
+
+    QuestionSummary:
+      type: object
+      properties:
+        questionId:
+          type: integer
+          example: 456
+        questionText:
+          type: string
+          example: What is the value of x in 2x + 5 = 15?
+        subjectName:
+          type: string
+          example: Mathematics
+        topicName:
+          type: string
+          example: Linear Equations
+        difficultyLevel:
+          type: string
+          example: Medium
+        typeName:
+          type: string
+          example: Multiple Choice Question
+        classLevel:
+          type: integer
+          example: 8
+        marks:
+          type: number
+          format: float
+          example: 1.0
+        successRate:
+          type: number
+          format: float
+          nullable: true
+          example: 67.5
+
+    QuestionDetail:
+      allOf:
+        - $ref: '#/components/schemas/QuestionSummary'
+        - type: object
+          properties:
+            questionHtml:
+              type: string
+              nullable: true
+              example: <p>What is the value of <strong>x</strong> in 2x + 5 = 15?</p>
+            questionImageUrl:
+              type: string
+              nullable: true
+              example: https://cdn.studentassessment.com/questions/q456.jpg
+            options:
+              type: array
+              items:
+                type: object
+                properties:
+                  optionId:
+                    type: integer
+                    example: 1823
+                  optionText:
+                    type: string
+                    example: x = 5
+                  optionOrder:
+                    type: integer
+                    example: 1
+            timeLimitSeconds:
+              type: integer
+              example: 180
+            tags:
+              type: array
+              items:
+                type: string
+              example: ["algebra", "linear-equations"]
+
+    QuestionCreate:
+      type: object
+      required:
+        - questionText
+        - typeId
+        - difficultyId
+        - subjectId
+        - classLevel
+        - examCategoryId
+      properties:
+        questionText:
+          type: string
+          minLength: 10
+          example: What is the value of x in 2x + 5 = 15?
+        questionHtml:
+          type: string
+          example: <p>What is the value of <strong>x</strong> in 2x + 5 = 15?</p>
+        typeId:
+          type: integer
+          example: 1
+        difficultyId:
+          type: integer
+          example: 2
+        subjectId:
+          type: integer
+          example: 1
+        topicId:
+          type: integer
+          example: 5
+        classLevel:
+          type: integer
+          minimum: 1
+          maximum: 10
+          example: 8
+        examCategoryId:
+          type: integer
+          example: 1
+        correctAnswer:
+          type: string
+          description: For MCQ/True-False/Numerical
+          example: "1823"
+        correctAnswerData:
+          type: object
+          description: For MSQ (array of option IDs)
+          example: {"optionIds": [1823, 1824]}
+        options:
+          type: array
+          description: Required for MCQ/MSQ/True-False
+          items:
+            type: object
+            required:
+              - optionText
+              - isCorrect
+            properties:
+              optionText:
+                type: string
+                example: x = 5
+              optionOrder:
+                type: integer
+                example: 1
+              isCorrect:
+                type: boolean
+                example: true
+        explanation:
+          type: object
+          required:
+            - explanationText
+          properties:
+            explanationText:
+              type: string
+              example: To solve 2x + 5 = 15, subtract 5 from both sides to get 2x = 10, then divide by 2 to get x = 5
+            explanationHtml:
+              type: string
+              example: <p>To solve 2x + 5 = 15...</p>
+        timeLimitSeconds:
+          type: integer
+          default: 180
+          example: 180
+        marks:
+          type: number
+          format: float
+          default: 1.0
+          example: 1.0
+        tags:
+          type: array
+          items:
+            type: string
+          example: ["algebra", "linear-equations"]
+
+    TestResult:
+      type: object
+      properties:
+        attemptId:
+          type: integer
+          example: 1001
+        testId:
+          type: integer
+          example: 5001
+        status:
+          type: string
+          example: completed
+        totalQuestions:
+          type: integer
+          example: 20
+        attemptedQuestions:
+          type: integer
+          example: 18
+        correctAnswers:
+          type: integer
+          example: 15
+        wrongAnswers:
+          type: integer
+          example: 3
+        unattempted:
+          type: integer
+          example: 2
+        score:
+          type: number
+          format: float
+          example: 15.0
+        maxScore:
+          type: number
+          format: float
+          example: 20.0
+        percentage:
+          type: number
+          format: float
+          example: 75.0
+        timeTakenSeconds:
+          type: integer
+          example: 1800
+        startedAt:
+          type: string
+          format: date-time
+          example: "2026-07-18T10:00:00Z"
+        submittedAt:
+          type: string
+          format: date-time
+          example: "2026-07-18T10:30:00Z"
+        pointsEarned:
+          type: integer
+          example: 150
+        responses:
+          type: array
+          items:
+            type: object
+            properties:
+              questionId:
+                type: integer
+                example: 456
+              questionText:
+                type: string
+                example: What is 2 + 2?
+              isCorrect:
+                type: boolean
+                example: true
+              marksAwarded:
+                type: number
+                format: float
+                example: 1.0
+              timeTakenSeconds:
+                type: integer
+                example: 45
+              explanation:
+                type: string
+                nullable: true
+                description: Only shown for wrong answers
+                example: null
+
+    Pagination:
+      type: object
+      properties:
+        currentPage:
+          type: integer
+          example: 1
+        totalPages:
+          type: integer
+          example: 10
+        totalItems:
+          type: integer
+          example: 195
+        itemsPerPage:
+          type: integer
+          example: 20
+        hasNextPage:
+          type: boolean
+          example: true
+        hasPreviousPage:
+          type: boolean
+          example: false
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: Invalid request data
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                    example: email
+                  message:
+                    type: string
+                    example: Email is required
+
+  responses:
+    BadRequest:
+      description: Bad request - validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error:
+              code: VALIDATION_ERROR
+              message: Invalid request data
+              details:
+                - field: email
+                  message: Invalid email format
+                - field: password
+                  message: Password must be at least 8 characters
+
+    Unauthorized:
+      description: Unauthorized - invalid or missing token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error:
+              code: UNAUTHORIZED
+              message: Authentication required
+
+    Forbidden:
+      description: Forbidden - insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error:
+              code: FORBIDDEN
+              message: You don't have permission to perform this action
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error:
+              code: NOT_FOUND
+              message: Resource not found
+
+    TooManyRequests:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error:
+              code: RATE_LIMIT_EXCEEDED
+              message: Too many requests. Please try again later.
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: Request limit per time window
+          example: 5
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: Remaining requests in current window
+          example: 0
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+          description: Unix timestamp when limit resets
+          example: 1721304000
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds to wait before retrying
+          example: 900

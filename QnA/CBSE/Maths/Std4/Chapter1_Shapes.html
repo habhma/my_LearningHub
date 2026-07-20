@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Interactive Quiz - Parts and Wholes</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+        }
+        .quiz-info {
+            display: flex;
+            justify-content: space-between;
+            background: #eef2f3;
+            padding: 10px 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .card {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .question-text {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #2d3748;
+        }
+        .options-list {
+            list-style: none;
+            padding: 0;
+        }
+        .option-item {
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .option-item:hover {
+            background: #f1f5f9;
+            border-color: #94a3b8;
+        }
+        .option-item.selected {
+            background: #e2e8f0;
+            border-color: #64748b;
+            font-weight: bold;
+        }
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            background: #3182ce;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-align: center;
+        }
+        .btn:hover {
+            background: #2b6cb0;
+        }
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+        }
+        .feedback.correct {
+            display: block;
+            background: #f0fff4;
+            border: 1px solid #c6f6d5;
+            color: #22543d;
+        }
+        .feedback.wrong {
+            display: block;
+            background: #fff5f5;
+            border: 1px solid #fed7d7;
+            color: #742a2a;
+        }
+        .explanation {
+            font-weight: normal;
+            margin-top: 5px;
+            font-size: 0.95em;
+        }
+        #result-screen {
+            display: none;
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .score-display {
+            font-size: 3em;
+            font-weight: bold;
+            color: #3182ce;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="quiz-screen">
+            <h1>Parts and Wholes Quiz</h1>
+            <div class="subtitle">Chapter 5: Sharing and Measuring Practice Problems</div>
+            <div class="quiz-info">
+                <span id="progress-text">Question 1 of 50</span>
+                <span id="score-text">Score: 0</span>
+            </div>
+            <div class="card" id="question-card">
+                <!-- Dynamic Content -->
+            </div>
+            <button class="btn" id="action-btn" onclick="handleAction()">Submit Answer</button>
+        </div>
+        
+        <div id="result-screen">
+            <h1>Quiz Completed!</h1>
+            <div class="subtitle">Here is your performance summary:</div>
+            <div class="score-display" id="final-score">0 / 50</div>
+            <p id="perf-msg" style="font-size: 1.2em; color: #4a5568;"></p>
+            <button class="btn" style="max-width: 200px; margin: 30px auto 0;" onclick="resetQuiz()">Restart Quiz</button>
+        </div>
+    </div>
+
+    <script>
+        const quizData = [{"id": 1, "question": "In the story at the beginning of the chapter, Ikra and Samina have a single drawing sheet. If Ikra divides it in half, how many equal parts is the sheet divided into?", "options": ["1 part", "2 equal parts", "3 equal parts", "4 equal parts"], "answer": 1, "explanation": "When an object is divided in half, it means it is divided into 2 equal parts."}, {"id": 2, "question": "Samina wants a bigger part of the paper and chooses 'two quarters' instead of 'one half'. Which part is actually bigger?", "options": ["One half is bigger", "Two quarters is bigger", "Both are equal", "It depends on the size of the paper"], "answer": 2, "explanation": "Two quarters (1/4 + 1/4) is equal to one half (1/2). They represent the exact same amount of the paper."}, {"id": 3, "question": "How do we write 'one half' using fraction symbols?", "options": ["1/4", "1/3", "1/2", "2/1"], "answer": 2, "explanation": "One half is written as 1/2, where 1 is the part and 2 is the total number of equal parts."}, {"id": 4, "question": "When an object is divided into 4 equal parts, each part is called a:", "options": ["Half", "Third", "Quarter", "Fifth"], "answer": 2, "explanation": "Each of the 4 equal parts of a whole object is called a quarter or one-fourth."}, {"id": 5, "question": "How do we write 'one quarter' using mathematical symbols?", "options": ["1/2", "1/4", "4/1", "1/3"], "answer": 1, "explanation": "A quarter or one-fourth is written as 1/4."}, {"id": 6, "question": "If an object is divided into 5 equal parts, what is the fraction symbol for each individual part?", "options": ["1/2", "1/4", "1/5", "5/1"], "answer": 2, "explanation": "Dividing a whole into 5 equal parts means each part represents 1/5 (one-fifth)."}, {"id": 7, "question": "Sumedha's mother made a dhokla. When shared equally between Sumedha and Vinayak, how much does each person get?", "options": ["1/3", "1/4", "1/2", "A whole"], "answer": 2, "explanation": "Sharing equally between 2 people means the dhokla is divided into two halves, so each gets 1/2."}, {"id": 8, "question": "Complete the statement from the chapter: '____ halves of a dhokla make a whole dhokla.'", "options": ["Three", "Four", "Two", "One"], "answer": 2, "explanation": "Two halves (1/2 + 1/2) join together to make one complete whole."}, {"id": 9, "question": "When Kumar joins Sumedha and Vinayak, the dhokla is divided equally among 3 people. What is each person's share?", "options": ["1/2", "1/3", "1/4", "1/5"], "answer": 1, "explanation": "When shared equally among 3 people, the whole is split into three equal parts, written as 1/3."}, {"id": 10, "question": "Sumedha's cousin Paridhi arrives next, making a total of 4 people. What fraction of the dhokla does each person receive now?", "options": ["One-half", "One-third", "One-fourth", "One-fifth"], "answer": 2, "explanation": "Sharing among 4 people means dividing the dhokla into four equal parts, so each person gets one-fourth (1/4)."}, {"id": 11, "question": "Their neighbour Idha arrives, so the dhokla is shared among 5 people. What fraction does each person get?", "options": ["1/3", "1/4", "1/5", "1/6"], "answer": 2, "explanation": "With 5 people sharing equally, each person gets 1/5 of the complete dhokla."}, {"id": 12, "question": "What happens to the size of each person's share of dhokla as more guests arrive?", "options": ["The share gets bigger", "The share gets smaller", "The share stays the same", "The share doubles"], "answer": 1, "explanation": "As a whole is equally divided among a larger number of parts or people, each individual part becomes smaller."}, {"id": 13, "question": "In which situation will Sumedha get a larger piece of dhokla?", "options": ["When shared among 9 people", "When shared among 11 people", "Both options give the same size", "It depends on who the guests are"], "answer": 0, "explanation": "Sharing among fewer people (9 instead of 11) results in fewer divisions, so each piece is larger. Therefore, 1/9 is greater than 1/11."}, {"id": 14, "question": "How many pieces of 1/6 would you need to combine to make one complete, whole dhokla?", "options": ["3 pieces", "4 pieces", "5 pieces", "6 pieces"], "answer": 3, "explanation": "Six pieces of 1/6 add up to 6/6, which is exactly equal to 1 whole."}, {"id": 15, "question": "If Idha doesn't like dhokla and gives her share (1/5) to Sumedha, and Sumedha already had her own 1/5 share, how much total dhokla does Sumedha have now?", "options": ["1/5", "2/5", "3/5", "1/2"], "answer": 1, "explanation": "Sumedha's share + Idha's share = 1/5 + 1/5 = 2/5 (two-fifths)."}, {"id": 16, "question": "If Idha and Vinayak BOTH give their 1/5 shares to Sumedha, who already has a 1/5 share, what is Sumedha's total share?", "options": ["2/5", "3/5", "4/5", "5/5"], "answer": 1, "explanation": "Sumedha gets 1/5 (herself) + 1/5 (Idha) + 1/5 (Vinayak) = 3/5 (three-fifths)."}, {"id": 17, "question": "Compare the fractions 1/5 and 1/8. Which statement is correct?", "options": ["1/5 is smaller than 1/8", "1/5 is greater than 1/8", "1/5 is equal to 1/8", "They cannot be compared"], "answer": 1, "explanation": "Since 5 is smaller than 8, dividing a whole into 5 parts gives larger pieces than dividing it into 8 parts. So, 1/5 > 1/8."}, {"id": 18, "question": "Fill in the blank: 1/7 is ________ than 1/9.", "options": ["greater", "smaller", "equal to", "half"], "answer": 0, "explanation": "1/7 is greater than 1/9 because dividing a whole into 7 equal parts yields larger sections than dividing it into 9 equal parts."}, {"id": 19, "question": "Which of the following fraction comparisons is FALSE?", "options": ["1/2 > 1/3", "1/4 > 1/6", "1/10 > 1/5", "1/6 > 1/8"], "answer": 2, "explanation": "1/10 is smaller than 1/5, not greater, because dividing a whole into 10 parts creates much smaller pieces than dividing it into 5 parts."}, {"id": 20, "question": "Idha has a garden split into 5 equal parts. In her original plan, she decides to plant Rose, Mogra, Lily, Marigold, and Jasmine equally. What fraction of the garden does Mogra occupy?", "options": ["1/2", "1/5", "2/5", "5/5"], "answer": 1, "explanation": "Since there are 5 plants divided equally into 5 parts, each plant occupies 1/5 of the garden."}, {"id": 21, "question": "In Idha's revised plan, she replaces the Lily section with an extra Rose section because she has very few Lily seeds. Now, how many parts out of 5 are planted with Roses?", "options": ["1 part", "2 parts", "3 parts", "4 parts"], "answer": 1, "explanation": "She plants Roses in two parts out of the 5 total parts, giving a total of 2/5 for Roses."}, {"id": 22, "question": "In a later layout of Idha's garden, Roses take up 3 parts out of 5 equal parts. How do we write this fraction?", "options": ["3/5", "5/3", "2/5", "1/3"], "answer": 0, "explanation": "Three parts out of five equal parts is written as 3/5 (three-fifths)."}, {"id": 23, "question": "If Roses occupy 5 parts out of 5 equal parts (5/5), what does this represent?", "options": ["None of the garden", "Half of the garden", "The complete garden", "A quarter of the garden"], "answer": 2, "explanation": "5/5 means 5 out of 5 parts, which represents 1 whole, or the complete garden."}, {"id": 24, "question": "You want to make a flower garden with seven equal sections. If Marigold occupies 1 section, what fraction is that?", "options": ["1/2", "1/5", "1/7", "7/1"], "answer": 2, "explanation": "One section out of 7 equal sections represents 1/7 (one-seventh)."}, {"id": 25, "question": "If Rose and Hibiscus each occupy 3 parts of a 7-part garden, what fraction does each occupy?", "options": ["3/7", "1/7", "2/7", "7/3"], "answer": 0, "explanation": "Three parts out of seven equal parts is written as 3/7."}, {"id": 26, "question": "Karan is a 'Dream Dosa Designer'. He makes a dosa divided into 4 equal quarters with 4 different toppings: Classic potato, Spicy onion, Chilly paneer, and Tangy tomato. What fraction is covered by Chilly paneer?", "options": ["1/2", "1/3", "1/4", "3/4"], "answer": 2, "explanation": "Since the dosa is divided into 4 equal parts, each topping covers exactly 1/4 (one-quarter) of the dosa."}, {"id": 27, "question": "A customer requests a dosa divided into 3 equal parts. 2 parts have Spicy onion topping and 1 part has Classic potato. What fraction of the dosa has Spicy onion?", "options": ["1/3", "2/3", "3/2", "2/4"], "answer": 1, "explanation": "Two parts out of three equal parts means 2/3 of the dosa is topped with Spicy onion."}, {"id": 28, "question": "Karan creates a special dosa with 8 equal slices. 3 slices are Classic potato, 1 slice is Chilly paneer, and 4 slices are Tangy tomato. What fraction of the dosa is Tangy tomato?", "options": ["3/8", "1/8", "4/8", "8/4"], "answer": 2, "explanation": "Four slices out of eight equal slices means 4/8 of the dosa is Tangy tomato (which is also equivalent to 1/2)."}, {"id": 29, "question": "Meena has 8 diyas in total. The textbook asks to colour 1/4 of her diyas red. To find 1/4 of 8, into how many equal parts should the 8 diyas be grouped?", "options": ["2 parts", "4 parts", "8 parts", "1 part"], "answer": 1, "explanation": "To find 1/4 of a collection, you must divide the total number of items into 4 equal groups."}, {"id": 30, "question": "If you divide 8 diyas into 4 equal groups, how many diyas are in each group?", "options": ["1 diya", "2 diyas", "3 diyas", "4 diyas"], "answer": 1, "explanation": "8 divided by 4 equals 2. So, each of the 4 equal groups contains 2 diyas. Therefore, 1/4 of 8 is 2."}, {"id": 31, "question": "There are 12 cookies. If 3 children want to share them equally, what fraction of the total cookies will each child get?", "options": ["1/2", "1/3", "1/4", "1/6"], "answer": 1, "explanation": "When shared among 3 children, each child gets 1/3 of the total cookies."}, {"id": 32, "question": "If 3 children share 12 cookies equally, how many cookies does each individual child receive?", "options": ["2 cookies", "3 cookies", "4 cookies", "6 cookies"], "answer": 2, "explanation": "1/3 of 12 cookies is found by calculating 12 \u00f7 3 = 4 cookies."}, {"id": 33, "question": "If 6 children share the 12 cookies equally, what is the fraction and the number of cookies each child gets?", "options": ["1/6 of the cookies, which is 2 cookies", "1/2 of the cookies, which is 6 cookies", "1/4 of the cookies, which is 3 cookies", "1/3 of the cookies, which is 4 cookies"], "answer": 0, "explanation": "Shared among 6 children means each gets 1/6 of the total. 12 \u00f7 6 = 2 cookies."}, {"id": 34, "question": "If 2 children share 12 cookies equally, how many cookies does each child get?", "options": ["4 cookies", "5 cookies", "6 cookies", "12 cookies"], "answer": 2, "explanation": "Each child gets half (1/2) of the cookies. 12 \u00f7 2 = 6 cookies."}, {"id": 35, "question": "If 4 children share 12 cookies equally, how many cookies does each child get?", "options": ["2 cookies", "3 cookies", "4 cookies", "5 cookies"], "answer": 1, "explanation": "Each child gets 1/4 of the cookies. 12 \u00f7 4 = 3 cookies."}, {"id": 36, "question": "Simran calls 9 friends to her birthday party. 1/3 of her friends receive a hairband as a return gift. How many friends receive a hairband?", "options": ["2 friends", "3 friends", "4 friends", "6 friends"], "answer": 1, "explanation": "There are 9 friends in the picture. 1/3 of 9 is calculated as 9 \u00f7 3 = 3 friends."}, {"id": 37, "question": "Mummy asks to divide a box of 16 barfis into four equal parts. How many barfis are in each part (which is 1/4 of the whole)?", "options": ["2 barfis", "4 barfis", "6 barfis", "8 barfis"], "answer": 1, "explanation": "To find 1/4 of 16, we divide 16 by 4, which equals 4 barfis per part."}, {"id": 38, "question": "Rohan has a piece of ribbon. Mohan's ribbon is one-fourth (1/4) as long as Rohan's ribbon. If Rohan's ribbon is 20 cm long, how long is Mohan's ribbon?", "options": ["5 cm", "10 cm", "15 cm", "4 cm"], "answer": 0, "explanation": "Mohan's ribbon is 1/4 of Rohan's, so 20 cm \u00f7 4 = 5 cm."}, {"id": 39, "question": "In an experiment, a rectangular paper is folded into 3 equal parts, and one part is colored (1/3). Then it is folded in half. The colored part now represents what fraction of the new smaller divisions?", "options": ["1/4", "2/5", "2/6", "3/6"], "answer": 2, "explanation": "Folding 3 equal parts in half creates 6 equal parts in total. The original 1 colored part is now split into 2 smaller colored parts out of 6, so 1/3 = 2/6."}, {"id": 40, "question": "Complete the equivalent fraction pattern from the paper-folding activity: 1/3 = 2/6 = 3/9 = ____", "options": ["4/10", "4/12", "5/12", "4/15"], "answer": 1, "explanation": "Multiplying the numerator and denominator of 1/3 by 4 gives 4/12. This is an equivalent fraction."}, {"id": 41, "question": "Complete the halving fraction pattern from the text: 1/2 = 2/4 = ____ = 4/8", "options": ["3/5", "3/6", "2/6", "3/8"], "answer": 1, "explanation": "The sequence shows equivalent fractions for a half. The missing term is 3/6."}, {"id": 42, "question": "According to the fraction chart in the textbook, how many quarters (1/4) are equal to one half (1/2)?", "options": ["1 quarter", "2 quarters", "3 quarters", "4 quarters"], "answer": 1, "explanation": "Looking at the chart or computing mathematically, 2 pieces of 1/4 equal 2/4, which simplifies to 1/2."}, {"id": 43, "question": "Is 2/3 smaller than or greater than 1/2?", "options": ["Smaller than 1/2", "Greater than 1/2", "Equal to 1/2", "It cannot be determined"], "answer": 1, "explanation": "2/3 (about 66.7%) is greater than 1/2 (50%). Alternatively, 2/3 is more than half of 3."}, {"id": 44, "question": "True or False: 'Ten pieces of 1/10 make a complete whole.'", "options": ["True", "False"], "answer": 0, "explanation": "True, because 10 pieces of 1/10 add up to 10/10, which equals 1 whole."}, {"id": 45, "question": "True or False: 'Three pieces of 1/6 are equal to two pieces of 1/8.'", "options": ["True", "False"], "answer": 1, "explanation": "False. Three pieces of 1/6 equals 3/6 = 1/2. Two pieces of 1/8 equals 2/8 = 1/4. 1/2 is not equal to 1/4."}, {"id": 46, "question": "How many pieces of 1/8 make a quarter (1/4)?", "options": ["2 pieces", "3 pieces", "4 pieces", "8 pieces"], "answer": 0, "explanation": "Two pieces of 1/8 equal 2/8, which simplifies to 1/4."}, {"id": 47, "question": "When cutting a shape into halves or quarters, what is the absolute most important rule?", "options": ["The parts must look pretty", "The parts must be of equal size", "The line must be horizontal", "The shape must be a rectangle"], "answer": 1, "explanation": "For a division to represent a true fraction like a half or a quarter, all the parts must be exactly equal in size."}, {"id": 48, "question": "If a square is divided into 3 columns, but the middle column is much wider than the outer two, does the shaded middle column represent 1/3 of the square?", "options": ["Yes, because there are 3 parts", "No, because the parts are not equal in size", "Yes, because it is in the center", "No, because columns can't represent thirds"], "answer": 1, "explanation": "Fractions require equal parts. If the parts are unequal, a single part does not accurately represent the fraction 1/3."}, {"id": 49, "question": "If an entire pizza is sliced into 6 equal parts, and you eat 4 parts, what fraction of the pizza did you eat?", "options": ["2/6", "4/6", "6/4", "1/6"], "answer": 1, "explanation": "Eating 4 out of 6 equal parts means you consumed 4/6 of the pizza."}, {"id": 50, "question": "What fraction is equivalent to 4/6?", "options": ["1/3", "2/3", "3/4", "1/2"], "answer": 1, "explanation": "Dividing both the numerator and denominator of 4/6 by 2 gives 2/3. Thus, 4/6 and 2/3 are equivalent fractions."}];
+        
+        let currentIdx = 0;
+        let score = 0;
+        let selectedOption = null;
+        let isAnswered = false;
+
+        function loadQuestion() {
+            isAnswered = false;
+            selectedOption = null;
+            document.getElementById('action-btn').innerText = "Submit Answer";
+            
+            const q = quizData[currentIdx];
+            document.getElementById('progress-text').innerText = `Question ${currentIdx + 1} of ${quizData.length}`;
+            
+            let html = `<div class="question-text">${q.question}</div><ul class="options-list">`;
+            q.options.forEach((opt, idx) => {
+                html += `<li class="option-item" id="opt-${idx}" onclick="selectOption(${idx})">${opt}</li>`;
+            });
+            html += `</ul><div class="feedback" id="feedback-box"></div>`;
+            
+            document.getElementById('question-card').innerHTML = html;
+        }
+
+        function selectOption(idx) {
+            if (isAnswered) return;
+            selectedOption = idx;
+            document.querySelectorAll('.option-item').forEach(el => el.classList.remove('selected'));
+            document.getElementById(`opt-${idx}`).classList.add('selected');
+        }
+
+        function handleAction() {
+            if (!isAnswered) {
+                if (selectedOption === null) {
+                    alert("Please select an option first!");
+                    return;
+                }
+                verifyAnswer();
+            } else {
+                currentIdx++;
+                if (currentIdx < quizData.length) {
+                    loadQuestion();
+                } else {
+                    showResults();
+                }
+            }
+        }
+
+        function verifyAnswer() {
+            isAnswered = true;
+            const q = quizData[currentIdx];
+            const feedbackBox = document.getElementById('feedback-box');
+            
+            if (selectedOption === q.answer) {
+                score++;
+                document.getElementById('score-text').innerText = `Score: ${score}`;
+                feedbackBox.className = "feedback correct";
+                feedbackBox.innerHTML = `<strong>Correct!</strong> <div class="explanation">${q.explanation}</div>`;
+            } else {
+                feedbackBox.className = "feedback wrong";
+                feedbackBox.innerHTML = `strong>Incorrect.</strong> The correct answer was: <em>${q.options[q.answer]}</em>.<div class="explanation">${q.explanation}</div>`;
+            }
+            
+            document.getElementById('action-btn').innerText = currentIdx === quizData.length - 1 ? "Finish Quiz" : "Next Question";
+        }
+
+        function showResults() {
+            document.getElementById('quiz-screen').style.display = 'none';
+            document.getElementById('result-screen').style.display = 'block';
+            document.getElementById('final-score').innerText = `${score} / ${quizData.length}`;
+            
+            let msg = "";
+            const pct = (score / quizData.length) * 100;
+            if (pct >= 90) msg = "Excellent job! You have fully mastered Parts and Wholes!";
+            else if (pct >= 70) msg = "Great effort! A little more practice and you'll be perfect.";
+            else msg = "Good try! Review the chapter explanations to strengthen your fraction understanding.";
+            
+            document.getElementById('perf-msg').innerText = msg;
+        }
+
+        function resetQuiz() {
+            currentIdx = 0;
+            score = 0;
+            document.getElementById('score-text').innerText = "Score: 0";
+            document.getElementById('quiz-screen').style.display = 'block';
+            document.getElementById('result-screen').style.display = 'none';
+            loadQuestion();
+        }
+
+        // Initialize quiz
+        loadQuestion();
+    </script>
+</body>
+</html>

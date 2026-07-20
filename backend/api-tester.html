@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assessment API Tester</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #2563eb; }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 15px;
+            font-weight: 600;
+        }
+        button:hover { background: #1d4ed8; }
+        button:disabled { background: #9ca3af; cursor: not-allowed; }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        pre {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            max-height: 400px;
+            font-size: 13px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 2px solid #10b981;
+        }
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 2px solid #ef4444;
+        }
+        .status.info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 2px solid #3b82f6;
+        }
+        label {
+            font-weight: 600;
+            color: #374151;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Assessment Platform API Tester</h1>
+        <p style="color: #6b7280;">Test your backend API endpoints</p>
+
+        <div id="status" class="status info">Click "Check Server" to start testing</div>
+
+        <div class="section">
+            <h2>1. Health Check</h2>
+            <button onclick="checkHealth()">Check Server</button>
+            <pre id="healthResult">Click the button above to check server health...</pre>
+        </div>
+
+        <div class="section">
+            <h2>2. Login</h2>
+            <label>Email:</label>
+            <input type="email" id="email" value="testadmin@test.com" placeholder="Email">
+            <label>Password:</label>
+            <input type="password" id="password" value="Admin123!" placeholder="Password">
+            <button onclick="login()">Login as Admin</button>
+            <button onclick="loginAsStudent()">Login as Student</button>
+            <pre id="loginResult">Login to get an authentication token...</pre>
+        </div>
+
+        <div class="section">
+            <h2>3. Create Assessment (Admin Only)</h2>
+            <label>Test Name:</label>
+            <input type="text" id="testName" value="My Test" placeholder="Test Name">
+            <label>Test Type:</label>
+            <select id="testType">
+                <option value="PRACTICE">Practice</option>
+                <option value="MOCK">Mock Exam</option>
+                <option value="DIAGNOSTIC">Diagnostic</option>
+            </select>
+            <label>Duration (minutes):</label>
+            <input type="number" id="duration" value="60">
+            <button onclick="createAssessment()" id="createBtn" disabled>Create Assessment</button>
+            <pre id="createResult">Login first to create assessments...</pre>
+        </div>
+
+        <div class="section">
+            <h2>4. List Assessments</h2>
+            <button onclick="listAssessments()" id="listBtn" disabled>List All Assessments</button>
+            <pre id="listResult">Login first to view assessments...</pre>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost:5000/api/v1';
+        let token = '';
+
+        function showStatus(msg, type = 'success') {
+            const div = document.getElementById('status');
+            div.className = 'status ' + type;
+            div.textContent = msg;
+        }
+
+        async function checkHealth() {
+            showStatus('Checking server...', 'info');
+            try {
+                const res = await fetch('http://localhost:5000/health');
+                const data = await res.json();
+                document.getElementById('healthResult').textContent = JSON.stringify(data, null, 2);
+                showStatus('✅ Server is running and healthy!', 'success');
+            } catch (e) {
+                document.getElementById('healthResult').textContent = 'Error: ' + e.message;
+                showStatus('❌ Server is not responding! Make sure backend is running.', 'error');
+            }
+        }
+
+        async function login() {
+            showStatus('Logging in...', 'info');
+            try {
+                const res = await fetch(BASE_URL + '/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: document.getElementById('email').value,
+                        password: document.getElementById('password').value
+                    })
+                });
+                const data = await res.json();
+                document.getElementById('loginResult').textContent = JSON.stringify(data, null, 2);
+
+                if (data.success) {
+                    token = data.data.accessToken;
+                    document.getElementById('createBtn').disabled = false;
+                    document.getElementById('listBtn').disabled = false;
+                    showStatus('✅ Login successful! Token saved. You can now use other features.', 'success');
+                } else {
+                    showStatus('❌ Login failed: ' + (data.error?.message || 'Unknown error'), 'error');
+                }
+            } catch (e) {
+                document.getElementById('loginResult').textContent = 'Error: ' + e.message;
+                showStatus('❌ Login request failed!', 'error');
+            }
+        }
+
+        function loginAsStudent() {
+            document.getElementById('email').value = 'student@test.com';
+            document.getElementById('password').value = 'Student123!';
+            login();
+        }
+
+        async function createAssessment() {
+            showStatus('Creating assessment...', 'info');
+            try {
+                const res = await fetch(BASE_URL + '/assessments', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({
+                        testName: document.getElementById('testName').value,
+                        testType: document.getElementById('testType').value,
+                        testConfig: {
+                            duration: parseInt(document.getElementById('duration').value),
+                            totalMarks: 100,
+                            passingMarks: 40
+                        },
+                        classLevel: 10
+                    })
+                });
+                const data = await res.json();
+                document.getElementById('createResult').textContent = JSON.stringify(data, null, 2);
+
+                if (data.success) {
+                    showStatus('✅ Assessment created successfully! ID: ' + data.data.id, 'success');
+                } else {
+                    showStatus('❌ Failed to create: ' + (data.error?.message || 'Unknown error'), 'error');
+                }
+            } catch (e) {
+                document.getElementById('createResult').textContent = 'Error: ' + e.message;
+                showStatus('❌ Create request failed!', 'error');
+            }
+        }
+
+        async function listAssessments() {
+            showStatus('Loading assessments...', 'info');
+            try {
+                const res = await fetch(BASE_URL + '/assessments?page=1&limit=10', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await res.json();
+                document.getElementById('listResult').textContent = JSON.stringify(data, null, 2);
+
+                if (data.success) {
+                    const count = data.data.assessments?.length || 0;
+                    showStatus('✅ Found ' + count + ' assessments', 'success');
+                } else {
+                    showStatus('❌ Failed to load: ' + (data.error?.message || 'Unknown error'), 'error');
+                }
+            } catch (e) {
+                document.getElementById('listResult').textContent = 'Error: ' + e.message;
+                showStatus('❌ List request failed!', 'error');
+            }
+        }
+
+        // Don't auto-run on load to avoid confusion
+        // User should click "Check Server" button
+    </script>
+</body>
+</html>

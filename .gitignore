@@ -1,0 +1,163 @@
+# ==========================================
+# Node.js
+# ==========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# ==========================================
+# Environment Variables & Secrets
+# ==========================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+*.env
+
+# Database credentials
+config/database.json
+database.json
+
+# ==========================================
+# Build Outputs
+# ==========================================
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# ==========================================
+# Frontend (React/Vite)
+# ==========================================
+frontend/dist/
+frontend/build/
+frontend/.vite/
+frontend/.cache/
+frontend/coverage/
+
+# ==========================================
+# Backend
+# ==========================================
+backend/dist/
+backend/build/
+backend/coverage/
+backend/uploads/
+backend/logs/
+*.log
+
+# ==========================================
+# TypeScript
+# ==========================================
+*.tsbuildinfo
+.tsc/
+
+# ==========================================
+# Testing
+# ==========================================
+coverage/
+*.lcov
+.nyc_output/
+test-results/
+playwright-report/
+
+# ==========================================
+# IDEs & Editors
+# ==========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*.bak
+*~
+.DS_Store
+Thumbs.db
+
+# ==========================================
+# Operating System
+# ==========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ==========================================
+# Temporary Files
+# ==========================================
+*.tmp
+*.temp
+*.cache
+.cache/
+tmp/
+temp/
+
+# ==========================================
+# Package Manager
+# ==========================================
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# ==========================================
+# Database
+# ==========================================
+*.sqlite
+*.sqlite3
+*.db
+
+# Prisma
+.prisma/
+prisma/migrations/*_draft/
+
+# ==========================================
+# Claude Code
+# ==========================================
+.claude/
+C:\Users\I032875\AppData\Local\Temp\claude/
+
+# ==========================================
+# Documentation (Optional - uncomment if needed)
+# ==========================================
+# EXPLANATION_FIX_SUMMARY.md
+
+# ==========================================
+# Uploads & User Generated Content
+# ==========================================
+uploads/
+public/uploads/
+static/uploads/
+
+# ==========================================
+# SSL Certificates
+# ==========================================
+*.pem
+*.key
+*.cert
+*.crt
+
+# ==========================================
+# Backup Files
+# ==========================================
+*.backup
+*.bak
+*~
+
+# ==========================================
+# Misc
+# ==========================================
+.eslintcache
+.stylelintcache
+
+# ==========================================
+# Project Specific Files
+# ==========================================
+L.png

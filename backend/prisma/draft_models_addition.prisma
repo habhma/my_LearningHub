@@ -1,0 +1,96 @@
+
+// =====================================================
+// DRAFT TABLES - For Bulk Load Review & Approval
+// =====================================================
+
+model QuestionDraft {
+  id                    BigInt              @id @default(autoincrement()) @map("question_id")
+  batchId               String?             @map("batch_id") @db.VarChar(50)
+  sourceFile            String?             @map("source_file") @db.VarChar(500)
+  questionText          String              @map("question_text") @db.Text
+  questionHtml          String?             @map("question_html") @db.Text
+  questionImageUrl      String?             @map("question_image_url") @db.VarChar(500)
+  typeId                Int                 @map("type_id")
+  difficultyId          Int                 @map("difficulty_id")
+  subjectId             Int                 @map("subject_id")
+  topicId               Int?                @map("topic_id")
+  classLevel            Int                 @map("class_level")
+  examCategoryId        Int                 @map("exam_category_id")
+  correctAnswer         String?             @map("correct_answer") @db.Text
+  correctAnswerData     Json?               @map("correct_answer_data") @db.JsonB
+  timeLimitSeconds      Int                 @default(180) @map("time_limit_seconds")
+  marks                 Decimal             @default(1.0) @db.Decimal(5, 2)
+  negativeMarks         Decimal             @default(0.0) @map("negative_marks") @db.Decimal(5, 2)
+  tags                  Json                @default("[]") @db.JsonB
+  metadata              Json                @default("{}") @db.JsonB
+  isApproved            Boolean             @default(false) @map("is_approved")
+  reviewedBy            BigInt?             @map("reviewed_by")
+  reviewedAt            DateTime?           @map("reviewed_at")
+  approvalNotes         String?             @map("approval_notes") @db.Text
+  createdBy             BigInt?             @map("created_by")
+  createdAt             DateTime            @default(now()) @map("created_at")
+  updatedAt             DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  type                  QuestionType        @relation(fields: [typeId], references: [id])
+  difficulty            DifficultyLevel     @relation(fields: [difficultyId], references: [id])
+  subject               Subject             @relation(fields: [subjectId], references: [id])
+  topic                 Topic?              @relation(fields: [topicId], references: [id])
+  examCategory          ExamCategory        @relation(fields: [examCategoryId], references: [id])
+  creator               User?               @relation("CreatedDraftQuestions", fields: [createdBy], references: [id])
+  reviewer              User?               @relation("ReviewedDraftQuestions", fields: [reviewedBy], references: [id])
+  options               QuestionOptionDraft[]
+  explanations          QuestionExplanationDraft[]
+
+  @@index([batchId])
+  @@index([typeId])
+  @@index([difficultyId])
+  @@index([subjectId])
+  @@index([topicId])
+  @@index([classLevel])
+  @@index([examCategoryId])
+  @@index([isApproved])
+  @@index([createdAt])
+  @@index([classLevel, subjectId, difficultyId])
+  @@map("questions_draft")
+}
+
+model QuestionOptionDraft {
+  id              BigInt         @id @default(autoincrement()) @map("option_id")
+  questionDraftId BigInt         @map("question_draft_id")
+  optionText      String         @map("option_text") @db.Text
+  optionHtml      String?        @map("option_html") @db.Text
+  optionImageUrl  String?        @map("option_image_url") @db.VarChar(500)
+  optionOrder     Int            @map("option_order")
+  isCorrect       Boolean        @default(false) @map("is_correct")
+  metadata        Json           @default("{}") @db.JsonB
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  questionDraft   QuestionDraft  @relation(fields: [questionDraftId], references: [id], onDelete: Cascade)
+
+  @@unique([questionDraftId, optionOrder])
+  @@index([questionDraftId])
+  @@index([isCorrect])
+  @@map("question_options_draft")
+}
+
+model QuestionExplanationDraft {
+  id                  BigInt         @id @default(autoincrement()) @map("explanation_id")
+  questionDraftId     BigInt         @map("question_draft_id")
+  explanationType     String         @default("CORRECT_ANSWER") @map("explanation_type") @db.VarChar(50)
+  explanationText     String         @map("explanation_text") @db.Text
+  explanationHtml     String?        @map("explanation_html") @db.Text
+  explanationImages   Json           @default("[]") @map("explanation_images") @db.JsonB
+  explanationVideoUrl String?        @map("explanation_video_url") @db.VarChar(500)
+  displayOrder        Int            @default(1) @map("display_order")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  questionDraft       QuestionDraft  @relation(fields: [questionDraftId], references: [id], onDelete: Cascade)
+
+  @@index([questionDraftId])
+  @@map("question_explanations_draft")
+}

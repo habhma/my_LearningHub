@@ -1,0 +1,44 @@
+Q1. What is the capital of India?
+A) Mumbai
+B) New Delhi
+C) Kolkata
+D) Chennai
+Answer: B
+Explanation: New Delhi is the capital of India and the seat of all three branches of the Government of India.
+Difficulty: EASY
+
+Q2. What is 2 + 2?
+A) 3
+B) 4
+C) 5
+D) 6
+Answer: B
+Explanation: Basic addition: 2 + 2 equals 4.
+Difficulty: EASY
+
+Q3. Who is known as the Father of the Indian Constitution?
+A) Mahatma Gandhi
+B) Jawaharlal Nehru
+C) Dr. B.R. Ambedkar
+D) Sardar Patel
+Answer: C
+Explanation: Dr. B.R. Ambedkar is known as the Father of the Indian Constitution as he was the chairman of the drafting committee.
+Difficulty: MEDIUM
+
+Q4. What is the largest planet in our solar system?
+A) Earth
+B) Mars
+C) Jupiter
+D) Saturn
+Answer: C
+Explanation: Jupiter is the largest planet in our solar system, with a mass more than twice that of all other planets combined.
+Difficulty: EASY
+
+Q5. What is the value of π (pi) approximately?
+A) 3.14
+B) 2.71
+C) 1.41
+D) 1.73
+Answer: A
+Explanation: Pi (π) is approximately 3.14159, commonly rounded to 3.14.
+Difficulty: MEDIUM

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple API Test</title>
+</head>
+<body>
+    <h1>Simple API Tester</h1>
+    <button id="testBtn">Click to Test Server</button>
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('testBtn').onclick = function() {
+            document.getElementById('result').innerHTML = 'Testing...';
+
+            fetch('http://localhost:5000/health')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('result').innerHTML =
+                        '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                })
+                .catch(e => {
+                    document.getElementById('result').innerHTML = 'Error: ' + e.message;
+                });
+        };
+
+        alert('JavaScript is working!');
+    </script>
+</body>
+</html>
