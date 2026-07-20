@@ -6,6 +6,7 @@ import { StartAttemptResponse } from '@/types';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
+import { soundManager } from '@/utils/sounds';
 
 function TakeAssessment() {
   const { id } = useParams<{ id: string }>();
@@ -14,16 +15,18 @@ function TakeAssessment() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answerFeedback, setAnswerFeedback] = useState<Record<string, boolean>>({}); // Track correct/wrong per question
   const [savingQuestionId, setSavingQuestionId] = useState<string | null>(null);
-  const [testStarted, setTestStarted] = useState(false); // Track if test has been started
+  const [testStarted, setTestStarted] = useState(false);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0); // NEW: Track current question
 
   // Timer state
-  const [timeRemaining, setTimeRemaining] = useState<number>(0); // in seconds
-  const [timeElapsed, setTimeElapsed] = useState<number>(0); // in seconds
+  const [timeRemaining, setTimeRemaining] = useState<number>(0);
+  const [timeElapsed, setTimeElapsed] = useState<number>(0);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<Date | null>(null);
 
-  // Load the assessment data (but don't start timer until user clicks Start)
+  // Load the assessment data
   useEffect(() => {
     if (!id) return;
 
@@ -32,7 +35,6 @@ function TakeAssessment() {
       .then((data) => {
         setAttemptData(data);
 
-        // Get duration from test config (in minutes, convert to seconds)
         const testConfig = (data.attempt as any).test?.testConfig;
         const durationInMinutes = testConfig?.duration;
 
@@ -44,13 +46,10 @@ function TakeAssessment() {
         }
 
         const durationInSeconds = durationInMinutes * 60;
-
-        // Check if this is a resumed attempt (more than 5 seconds elapsed)
         const attemptStartTime = new Date((data.attempt as any).startedAt);
         const now = new Date();
         const elapsedSeconds = Math.floor((now.getTime() - attemptStartTime.getTime()) / 1000);
 
-        // If more than 5 seconds have elapsed, this is a genuine resume
         if (elapsedSeconds > 5) {
           const remainingSeconds = Math.max(0, durationInSeconds - elapsedSeconds);
           setTimeRemaining(remainingSeconds);
@@ -63,13 +62,11 @@ function TakeAssessment() {
             icon: '⏱️',
           });
 
-          // If time already expired, auto-submit
           if (remainingSeconds <= 0) {
             toast.error('Time has expired for this assessment!');
             handleAutoSubmit(data.attempt.id);
           }
         } else {
-          // Fresh attempt - wait for user to click Start Test
           setTimeRemaining(durationInSeconds);
           setTimeElapsed(0);
         }
@@ -78,7 +75,7 @@ function TakeAssessment() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  // Timer countdown (only when test is started)
+  // Timer countdown
   useEffect(() => {
     if (!attemptData || !testStarted || timeRemaining <= 0) return;
 
@@ -87,17 +84,15 @@ function TakeAssessment() {
         const newTime = prev - 1;
         setTimeElapsed((elapsed) => elapsed + 1);
 
-        // Time's up! Auto-submit
         if (newTime <= 0) {
           if (timerIntervalRef.current) {
             clearInterval(timerIntervalRef.current);
           }
-          toast.error('Time\'s up! Submitting your assessment...');
+          toast.error('Time is up! Submitting your assessment...');
           handleAutoSubmit(attemptData.attempt.id);
           return 0;
         }
 
-        // Warning at 5 minutes
         if (newTime === 300) {
           toast('5 minutes remaining!', {
             duration: 5000,
@@ -109,7 +104,6 @@ function TakeAssessment() {
           });
         }
 
-        // Warning at 1 minute
         if (newTime === 60) {
           toast('1 minute remaining!', {
             duration: 5000,
@@ -132,7 +126,6 @@ function TakeAssessment() {
     };
   }, [attemptData, testStarted, timeRemaining]);
 
-  // Auto-submit when time expires
   const handleAutoSubmit = async (attemptId: string) => {
     try {
       const result = await submissionService.submitAttempt(attemptId);
@@ -150,7 +143,32 @@ function TakeAssessment() {
         return;
       }
 
+      // Prevent changing answer if already answered
+      if (questionId in answerFeedback) {
+        toast.error('You cannot change your answer once selected!');
+        return;
+      }
+
+      const currentQuestion = attemptData.questions[currentQuestionIndex];
+      if (!currentQuestion) {
+        toast.error('Question not found');
+        return;
+      }
+
+      const selectedOption = currentQuestion.options.find(opt => opt.id === optionId);
+      const isCorrect = selectedOption?.isCorrect || false;
+
+      // Play sound immediately
+      if (isCorrect) {
+        soundManager.playCorrect();
+      } else {
+        soundManager.playWrong();
+      }
+
+      // Store answer and feedback
       setAnswers((prev) => ({ ...prev, [questionId]: optionId }));
+      setAnswerFeedback((prev) => ({ ...prev, [questionId]: isCorrect }));
+
       setSavingQuestionId(questionId);
       try {
         await submissionService.submitAnswer(attemptData.attempt.id, {
@@ -163,13 +181,12 @@ function TakeAssessment() {
         setSavingQuestionId(null);
       }
     },
-    [attemptData, testStarted, timeRemaining]
+    [attemptData, testStarted, timeRemaining, currentQuestionIndex, answerFeedback]
   );
 
   const handleSubmit = async () => {
     if (!attemptData) return;
 
-    // Confirm submission
     if (!window.confirm('Are you sure you want to submit your assessment? You cannot change your answers after submission.')) {
       return;
     }
@@ -178,7 +195,6 @@ function TakeAssessment() {
     try {
       const result = await submissionService.submitAttempt(attemptData.attempt.id);
 
-      // Clear timer
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
       }
@@ -192,27 +208,37 @@ function TakeAssessment() {
     }
   };
 
-  // Start the test timer
   const handleStartTest = () => {
     if (!attemptData) return;
-
     setTestStarted(true);
     startTimeRef.current = new Date();
     toast.success('Test started! Good luck!');
   };
 
-  // Format time display (MM:SS)
+  const handleNextQuestion = () => {
+    if (currentQuestionIndex < (attemptData?.questions.length || 0) - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+      soundManager.playClick();
+    }
+  };
+
+  const handlePreviousQuestion = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(prev => prev - 1);
+      soundManager.playClick();
+    }
+  };
+
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Get timer color based on time remaining
   const getTimerColor = (): string => {
-    if (timeRemaining > 300) return 'text-green-600 dark:text-green-400'; // > 5 mins
-    if (timeRemaining > 60) return 'text-yellow-600 dark:text-yellow-400'; // > 1 min
-    return 'text-red-600 dark:text-red-400'; // <= 1 min
+    if (timeRemaining > 300) return 'text-green-600 dark:text-green-400';
+    if (timeRemaining > 60) return 'text-yellow-600 dark:text-yellow-400';
+    return 'text-red-600 dark:text-red-400';
   };
 
   const getTimerBgColor = (): string => {
@@ -235,6 +261,16 @@ function TakeAssessment() {
 
   const { questions } = attemptData;
   const answeredCount = Object.keys(answers).length;
+  const currentQuestion = questions[currentQuestionIndex];
+
+  // Safety check - if currentQuestion is undefined, something went wrong
+  if (!currentQuestion) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 text-center">
+        <p className="text-gray-600 dark:text-gray-400">Question not found. Please restart the assessment.</p>
+      </div>
+    );
+  }
 
   // Show instruction screen if test hasn't started yet
   if (!testStarted) {
@@ -242,7 +278,6 @@ function TakeAssessment() {
     const duration = testConfig?.duration;
     const testName = (attemptData.attempt as any).test?.testName || 'Assessment';
 
-    // If duration is missing, show error
     if (!duration) {
       return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
@@ -384,6 +419,14 @@ function TakeAssessment() {
                   <ul className="space-y-2 text-sm text-yellow-800 dark:text-yellow-200">
                     <li className="flex items-start gap-2">
                       <span className="font-bold mt-0.5">•</span>
+                      <span>You'll see <strong>one question at a time</strong> with Next/Previous buttons for navigation.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="font-bold mt-0.5">•</span>
+                      <span>You'll receive <strong>instant feedback</strong> (correct/wrong) with a sound when you select an answer.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="font-bold mt-0.5">•</span>
                       <span>Once you click "Start Test", the timer will begin and cannot be paused.</span>
                     </li>
                     <li className="flex items-start gap-2">
@@ -392,15 +435,7 @@ function TakeAssessment() {
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="font-bold mt-0.5">•</span>
-                      <span>If time expires, your test will be automatically submitted with all saved answers.</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="font-bold mt-0.5">•</span>
-                      <span>You cannot change answers after the time limit or after submission.</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="font-bold mt-0.5">•</span>
-                      <span>Make sure you have a stable internet connection throughout the test.</span>
+                      <span>Detailed explanations for wrong answers will be shown after you submit the test.</span>
                     </li>
                   </ul>
                 </div>
@@ -429,14 +464,19 @@ function TakeAssessment() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-      <div className="max-w-3xl mx-auto">
-        {/* Header with Timer */}
+      <div className="max-w-4xl mx-auto">
+        {/* Header with Timer and Progress */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Take Assessment</h1>
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              {answeredCount} / {questions.length} answered
-            </span>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                Question {currentQuestionIndex + 1} of {questions.length}
+              </span>
+              <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                {answeredCount} / {questions.length} answered
+              </span>
+            </div>
           </div>
 
           {/* Timer Card */}
@@ -468,6 +508,17 @@ function TakeAssessment() {
                     </p>
                   </div>
                 </div>
+
+                {/* Progress Bar */}
+                <div className="flex-1 max-w-md mx-8">
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div
+                      className="h-2 rounded-full bg-blue-600 dark:bg-blue-500 transition-all"
+                      style={{ width: `${(answeredCount / questions.length) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+
                 <div className="text-right">
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     Time Elapsed
@@ -494,83 +545,196 @@ function TakeAssessment() {
           </Card>
         </div>
 
-        {/* Questions */}
-        <div className="space-y-6">
-          {questions.map((q, index) => (
-            <Card key={q.questionId}>
-              <div className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <h3 className="font-medium text-gray-900 dark:text-white">
-                    {index + 1}. {q.questionText}
-                  </h3>
-                  {savingQuestionId === q.questionId && (
-                    <span className="text-xs text-gray-400">Saving...</span>
-                  )}
+        {/* Current Question Card */}
+        <Card>
+          <div className="p-8">
+            <div className="flex items-start justify-between mb-6">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 rounded-full text-sm font-semibold">
+                    Question {currentQuestionIndex + 1}
+                  </span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    {currentQuestion.marks} mark{currentQuestion.marks > 1 ? 's' : ''}
+                  </span>
                 </div>
-                <div className="space-y-2">
-                  {q.options.length > 0 ? (
-                    q.options.map((opt) => (
-                      <label
-                        key={opt.id}
-                        className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
-                          answers[q.questionId] === opt.id
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
-                            : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
-                        } ${!testStarted || timeRemaining <= 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        <input
-                          type="radio"
-                          name={`question-${q.questionId}`}
-                          checked={answers[q.questionId] === opt.id}
-                          onChange={() => handleSelectOption(q.questionId, opt.id)}
-                          disabled={!testStarted || timeRemaining <= 0}
-                        />
-                        <span className="text-sm text-gray-700 dark:text-gray-300">
-                          {opt.optionText}
-                        </span>
-                      </label>
-                    ))
+                <h3 className="text-xl font-medium text-gray-900 dark:text-white leading-relaxed">
+                  {currentQuestion.questionText}
+                </h3>
+                {currentQuestion.questionImageUrl && (
+                  <img
+                    src={currentQuestion.questionImageUrl}
+                    alt="Question"
+                    className="mt-4 rounded-lg max-w-full h-auto"
+                  />
+                )}
+              </div>
+              {savingQuestionId === currentQuestion.questionId && (
+                <span className="text-xs text-gray-400 ml-4">Saving...</span>
+              )}
+            </div>
+
+            {/* Options */}
+            <div className="space-y-3 mb-6">
+              {currentQuestion.options.length > 0 ? (
+                currentQuestion.options.map((opt) => {
+                  const isSelected = answers[currentQuestion.questionId] === opt.id;
+                  const isAnswered = currentQuestion.questionId in answerFeedback;
+                  const isCorrectAnswer = isAnswered && answerFeedback[currentQuestion.questionId];
+                  const isWrongAnswer = isAnswered && !answerFeedback[currentQuestion.questionId];
+                  const isDisabled = !testStarted || timeRemaining <= 0 || isAnswered; // Disable after answer is selected
+
+                  return (
+                    <label
+                      key={opt.id}
+                      className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-all ${
+                        isSelected && isCorrectAnswer
+                          ? 'border-green-500 bg-green-50 dark:bg-green-900/30'
+                          : isSelected && isWrongAnswer
+                          ? 'border-red-500 bg-red-50 dark:bg-red-900/30'
+                          : isSelected
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                          : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                      } ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <input
+                        type="radio"
+                        name={`question-${currentQuestion.questionId}`}
+                        checked={isSelected}
+                        onChange={() => handleSelectOption(currentQuestion.questionId, opt.id)}
+                        disabled={isDisabled}
+                        className="w-5 h-5 text-blue-600"
+                      />
+                      <span className="flex-1 text-base text-gray-900 dark:text-gray-100">
+                        {opt.optionText}
+                      </span>
+                      {isSelected && isCorrectAnswer && (
+                        <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                      {isSelected && isWrongAnswer && (
+                        <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      )}
+                    </label>
+                  );
+                })
+              ) : (
+                <textarea
+                  rows={4}
+                  value={answers[currentQuestion.questionId] || ''}
+                  onChange={(e) =>
+                    setAnswers((prev) => ({ ...prev, [currentQuestion.questionId]: e.target.value }))
+                  }
+                  onBlur={async (e) => {
+                    if (!attemptData || !testStarted || timeRemaining <= 0) return;
+                    setSavingQuestionId(currentQuestion.questionId);
+                    try {
+                      await submissionService.submitAnswer(attemptData.attempt.id, {
+                        questionId: currentQuestion.questionId,
+                        textAnswer: e.target.value,
+                      });
+                    } catch (error: any) {
+                      toast.error(error.message || 'Failed to save answer');
+                    } finally {
+                      setSavingQuestionId(null);
+                    }
+                  }}
+                  disabled={!testStarted || timeRemaining <= 0}
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed focus:ring-2 focus:ring-blue-500"
+                  placeholder="Type your answer..."
+                />
+              )}
+            </div>
+
+            {/* Instant Feedback Message */}
+            {currentQuestion.questionId in answerFeedback && (
+              <div className={`p-4 rounded-lg mb-6 ${
+                answerFeedback[currentQuestion.questionId]
+                  ? 'bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700'
+                  : 'bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {answerFeedback[currentQuestion.questionId] ? (
+                    <>
+                      <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="font-semibold text-green-700 dark:text-green-300">
+                        Correct! Well done! 🎉
+                      </span>
+                    </>
                   ) : (
-                    <textarea
-                      rows={3}
-                      value={answers[q.questionId] || ''}
-                      onChange={(e) =>
-                        setAnswers((prev) => ({ ...prev, [q.questionId]: e.target.value }))
-                      }
-                      onBlur={async (e) => {
-                        if (!attemptData || !testStarted || timeRemaining <= 0) return;
-                        setSavingQuestionId(q.questionId);
-                        try {
-                          await submissionService.submitAnswer(attemptData.attempt.id, {
-                            questionId: q.questionId,
-                            textAnswer: e.target.value,
-                          });
-                        } catch (error: any) {
-                          toast.error(error.message || 'Failed to save answer');
-                        } finally {
-                          setSavingQuestionId(null);
-                        }
-                      }}
-                      disabled={!testStarted || timeRemaining <= 0}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                      placeholder="Type your answer..."
-                    />
+                    <>
+                      <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="font-semibold text-red-700 dark:text-red-300">
+                        Incorrect. Don't worry, you'll see the explanation after submission!
+                      </span>
+                    </>
                   )}
                 </div>
               </div>
-            </Card>
-          ))}
-        </div>
+            )}
 
-        {/* Submit Button */}
-        <div className="mt-6 flex justify-end">
-          <Button
-            onClick={handleSubmit}
-            isLoading={submitting}
-            disabled={!testStarted || timeRemaining <= 0}
-          >
-            Submit Assessment
-          </Button>
+            {/* Navigation and Submit Buttons */}
+            <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                onClick={handlePreviousQuestion}
+                disabled={currentQuestionIndex === 0}
+                className="px-6 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
+              >
+                ← Previous
+              </Button>
+
+              <div className="flex gap-3">
+                {currentQuestionIndex === questions.length - 1 ? (
+                  <Button
+                    onClick={handleSubmit}
+                    isLoading={submitting}
+                    disabled={!testStarted || timeRemaining <= 0}
+                    className="px-8 py-2 bg-green-600 hover:bg-green-700"
+                  >
+                    Submit Assessment
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleNextQuestion}
+                    disabled={currentQuestionIndex === questions.length - 1}
+                    className="px-6 py-2 disabled:cursor-not-allowed"
+                  >
+                    Next →
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Question Navigator - Mini dots */}
+        <div className="mt-6 flex justify-center gap-2 flex-wrap">
+          {questions.map((q, idx) => (
+            <button
+              key={q.questionId}
+              onClick={() => {
+                setCurrentQuestionIndex(idx);
+                soundManager.playClick();
+              }}
+              className={`w-10 h-10 rounded-lg text-sm font-semibold transition-all ${
+                idx === currentQuestionIndex
+                  ? 'bg-blue-600 text-white ring-2 ring-blue-300'
+                  : answers[q.questionId]
+                  ? 'bg-green-200 dark:bg-green-800 text-green-900 dark:text-green-100'
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+              }`}
+              title={`Question ${idx + 1}${answers[q.questionId] ? ' (Answered)' : ''}`}
+            >
+              {idx + 1}
+            </button>
+          ))}
         </div>
       </div>
     </div>

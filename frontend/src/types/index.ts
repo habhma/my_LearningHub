@@ -267,6 +267,7 @@ export interface TestAttemptOption {
   id: string;
   optionText: string;
   optionOrder: number;
+  isCorrect?: boolean; // Added for instant feedback during test
 }
 
 export interface TestAttemptQuestion {

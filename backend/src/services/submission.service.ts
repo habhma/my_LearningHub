@@ -35,7 +35,7 @@ export class SubmissionService {
                 type: { select: { typeCode: true, typeName: true } },
                 options: {
                   orderBy: { optionOrder: 'asc' },
-                  select: { id: true, optionText: true, optionOrder: true },
+                  select: { id: true, optionText: true, optionOrder: true, isCorrect: true },
                 },
               },
             },
@@ -105,6 +105,7 @@ export class SubmissionService {
               id: o.id.toString(),
               optionText: o.optionText,
               optionOrder: o.optionOrder,
+              isCorrect: o.isCorrect, // Include isCorrect for instant feedback
             })),
           })),
         };
@@ -149,6 +150,7 @@ export class SubmissionService {
           id: o.id.toString(),
           optionText: o.optionText,
           optionOrder: o.optionOrder,
+          isCorrect: o.isCorrect, // Include isCorrect for instant feedback
         })),
       })),
     };
