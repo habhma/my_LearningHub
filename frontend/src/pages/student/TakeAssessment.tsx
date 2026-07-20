@@ -308,11 +308,15 @@ function TakeAssessment() {
       return;
     }
 
-    // Pick a random star from user's favorites
-    const randomStarId = favoriteSportsStars[Math.floor(Math.random() * favoriteSportsStars.length)];
-    console.log('Selected random star ID:', randomStarId);
+    // Rotate through stars based on milestone
+    // Milestones: 20%, 40%, 60%, 80%, 100% (0-4 index)
+    const milestones = [20, 40, 60, 80, 100];
+    const milestoneIndex = milestones.indexOf(milestone);
+    const starIndex = milestoneIndex % favoriteSportsStars.length;
+    const selectedStarId = favoriteSportsStars[starIndex];
+    console.log(`Milestone ${milestone} (index ${milestoneIndex}) -> using star at index ${starIndex}: ${selectedStarId}`);
 
-    const star = SPORTS_STARS.find(s => s.id === randomStarId);
+    const star = SPORTS_STARS.find(s => s.id === selectedStarId);
     console.log('Found star:', star);
 
     if (star) {
