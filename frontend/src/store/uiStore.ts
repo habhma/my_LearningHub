@@ -29,7 +29,7 @@ export const useUIStore = create<UIState>((set) => ({
   setSidebarOpen: (open: boolean) => set({ isSidebarOpen: open }),
 
   // Theme state
-  isDarkMode: false,
+  isDarkMode: localStorage.getItem('theme') === 'dark',
   toggleTheme: () =>
     set((state) => {
       const newTheme = !state.isDarkMode;

@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import ThemeToggle from '@/components/common/ThemeToggle';
 import toast from 'react-hot-toast';
 
 interface LayoutProps {
@@ -60,6 +61,7 @@ function DashboardLayout({ children }: LayoutProps) {
                   {user?.role}
                 </p>
               </div>
+              <ThemeToggle />
               <button
                 onClick={handleLogout}
                 className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
